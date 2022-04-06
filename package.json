@@ -1,0 +1,18 @@
+{
+  "name": "game-status",
+  "version": "1.0.0",
+  "description": "discord bot",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "GNU GPLv3",
+  "dependencies": {
+    "chartjs-adapter-date-fns": "^2.0.0",
+    "chartjs-node-canvas": "^4.1.6",
+    "discord.js": "^13.6.0",
+    "dotenv": "^10.0.0",
+    "gamedig": "^4.0.2"
+  }
+}

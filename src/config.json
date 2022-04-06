@@ -1,0 +1,30 @@
+{
+	"statusUpdateTime" : 60,
+	"ownerID" : "",
+
+	"instances": [
+		{
+			"discordBotToken" : "",
+			"serverStatusChannelId" : "",
+
+			"timezone" : "",
+			
+			"server_type" : "",
+			"server_host" : "",
+			"server_port" : "",
+			"server_join" : "",
+			
+			"server_title" : "",
+			"server_name" : "",
+			"server_logo" : "",
+			"server_url" : "",
+			"server_color" : "#00FF00",
+			
+			"steam_btn" : true,
+			"minimal" : false,
+			"server_enable_playerlist" : true,
+			"server_enable_graph" : true,
+			"server_enable_numbers" : false
+		}
+	]
+}
