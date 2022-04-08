@@ -39,6 +39,7 @@
 - Maintenance mode
 - (Possibly) Display other information about the server
 - Fix problem with image(graph) cutting off on mobile client
+- Option to toggle player data - time on server. Maybe change alltogether list to multiple collumns. 
 
 
 ## src/config.json
