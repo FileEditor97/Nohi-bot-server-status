@@ -1,6 +1,6 @@
 /*
 	Author: Ramzi Sah#2992
-	Fork by: GreenLord#0593
+	Fork by: FileEditor97
 	Desription:
 		main bot code
 */
@@ -45,9 +45,20 @@ function init() {
 //----------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------
 // common
-function Sleep(milliseconds) {
-	return new Promise(resolve => setTimeout(resolve, milliseconds));
-};
+const { setTimeout } = require('timers/promises');
+function Sleep(ms) {
+	return setTimeout(ms);
+}
+
+let cancelTimeout = new AbortController();
+async function SleepCanceable(ms) {
+	try {
+		await setTimeout(ms, undefined, { signal: cancelTimeout.signal });
+	} catch (error) {
+		if (error.name === 'AbortError')
+			cancelTimeout = new AbortController();
+	}
+}
 
 //----------------------------------------------------------------------------------------------------------
 // create client
@@ -100,7 +111,7 @@ client.on('ready', async () => {
 	startStatusMessage(statusMessage);
 	
 	// start generate graph loop
-	generateGraph();
+	generateGraph(); // needs it's own loop, as graph is generated only once every minute
 });
 
 //----------------------------------------------------------------------------------------------------------
@@ -117,7 +128,7 @@ async function createStatusMessage(statusChannel) {
 
 	// OR create new message
 	let embed = new MessageEmbed();
-	embed.setTitle("instance starting...");
+	embed.setTitle("Запускаю панель...");
 	embed.setColor('#ffff00');
 	
 	return await statusChannel.send({ embeds: [embed] }).then((sentMessage)=> {
@@ -141,21 +152,34 @@ function getLastMessage(statusChannel) {
 //----------------------------------------------------------------------------------------------------------
 // main loops
 async function startStatusMessage(statusMessage) {
-	while(true){
+	while(client.token != null){ // client.token is not null if it's alive (logged in)
 		try {
-			// steam link button
+			// steam link and refresh button button
 			let row = new MessageActionRow()
-			row.addComponents(
-				new MessageButton()
-					.setCustomId('steamLink')
-					.setLabel('Присоединиться')
-					.setStyle('PRIMARY')
-			);
+				.addComponents(
+					new MessageButton()
+						.setCustomId('refresh')
+						.setEmoji('🔄')
+						.setLabel('Обновить')
+						.setStyle('SECONDARY')
+						.setDisabled()
+				);
+			if (config['steam_connect_button']) {
+				row.addComponents(
+					new MessageButton()
+						.setCustomId('steamLink')
+						.setLabel('Присоединиться')
+						.setStyle('PRIMARY')
+				);
+			}
 		
 			let embed = await generateStatusEmbed();
-			statusMessage.edit({ embeds: [embed], components: config["steam_btn"] ? [row] : [],
+			statusMessage.edit({ embeds: [embed], components: [row],
 				files: config["server_enable_graph"] ? [new MessageAttachment(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
-			});
+			}).then(() => setTimeout(6000).finally(() => {
+				row.components[0].setDisabled(false);
+				statusMessage.edit({components: [row]});
+			}));
 		} catch (error) {
 			process.send({
 				instanceid : instanceId,
@@ -163,12 +187,12 @@ async function startStatusMessage(statusMessage) {
 			});
 		};
 
-		await Sleep(config["statusUpdateTime"] * 1000);
+		await SleepCanceable(config["statusUpdateTime"] * 1000);
 	};
 };
 
 client.once('reconnecting', c => {
-	console.log(`[`+instanceId+`] 🔃 Reconnecting...`);
+	console.log(`[%d] 🔃 Reconnecting...`, instanceId);
 });
 
 client.on('interactionCreate', interaction => {
@@ -176,15 +200,22 @@ client.on('interactionCreate', interaction => {
 
 	// Check for CustomID
 	if (interaction.customId == 'steamLink')
-		interaction.reply({ content: 'steam://connect/' + config["server_host"] + ':' + config["server_port"], ephemeral: true });
+		interaction.reply({ content: 'steam://connect/' + config["server_host"] + ':' + config["server_port"], ephemeral: true })
+
+	else if (interaction.customId == 'refresh') {
+		interaction.deferUpdate();
+		cancelTimeout.abort();
+	}
 
 });
 
-// Shutdown sequence
-client.on('messageCreate', msg => {
+// DM's listener
+client.on('messageCreate', async msg => {
+	if (msg.author.bot) return;
+
 	if (msg.channel.type == "DM" && msg.content == "shutdown") {
-		if (msg.author.id == config["owner_id"]) {
-			msg.reply({ content: 'Shutting down...', allowedMentions: { repliedUser: false }}).then(m => {
+		if (msg.author.id == config["ownerID"]) {
+			await msg.channel.send("Shutting down...").then(m => {
 				client.user.setActivity("Shutting down...", { type: 'PLAYING' });
 				process.send({
 					instanceid : instanceId,
@@ -257,7 +288,7 @@ function generateStatusEmbed() {
 			//-----------------------------------------------------------------------------------------------
 			// basic server info
 			if (!config["minimal"]) {
-				embed.addField("Прямое подключение" + ' :', "`" + state.connect + "`" + (config["server_join"] != "" ? "\nили " + config["server_join"] : ""), true);
+				embed.addField("Прямое подключение" + ' :', "`" + state.connect + "`", true);
 				embed.addField("Режим игры" + ' :', config["server_type"] , true);
 				if (state.map == "") {
 					embed.addField("\u200B", "\u200B", true);
@@ -297,77 +328,133 @@ function generateStatusEmbed() {
 				// declare field label
 				let field_label = "";
 				
-				for (let j = 0; j < dataKeys.length && j < 2; j++) {
-					// check if data key empty
-					if (dataKeys[j] == "") {
-						dataKeys[j] = "\u200B";
-					};
-					
-					let player_datas = "```\n";
+				if (config["playerlist_experimental"]) {
+					field_label = "Время и Ник";
+					let field_value = "```\n";
 					for (let i = 0; i < state.players.length; i++) {
 						// break if too many players, prevent discord message overflood
 						if (i + 1 > 64) {
-							if (j == 0) player_datas += "и еще " + (state.players.length - 50) + "...";
-							else player_datas += "...";
+							field_value += "и еще " + (state.players.length - 64) + "...";
 							break;
-						};
+						}
 
 						// set player data
-						if (state.players[i][dataKeys[j]] != undefined) {
+						if (state.players[i]['name'] != undefined) {
 							let player_data = null;
-							let process_time = false;
-							
-							// Player name field
-							if (typeof state.players[i][dataKeys[j]] == 'string') {
-								process_time = false;
-								field_label = "Ник";
-								player_data = state.players[i][dataKeys[j]].toString();
-								if (player_data == "") {
-									player_data = "*loading*";
+
+							// adding numbers to beginning of name list
+							let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
+							if (config["server_enable_numbers"]) {
+								field_value += index + '. ';
+							};
+
+							// player time data
+							player_data = state.players[i]['raw'].time;
+							if (player_data == undefined) {
+								player_data = 0;
+							};
+							// process time
+							let date = new Date(player_data * 1000).toISOString().substring(11,19).split(":");
+							date = date[0] + ":" + date[1];
+							field_value += date;
+
+							field_value += " | "
+
+							// player name data
+							player_data = state.players[i]['name'];
+							if (player_data == "") {
+								player_data = "*loading*";
+							};
+							// process name
+							for (let k = 0; k < player_data.length; k++) {
+								if (player_data[k] == "^") {
+									player_data = player_data.slice(0, k) + " " + player_data.slice(k+2);
 								};
 							};
-							
-							// Player time field
-							if (state.players[i][dataKeys[j]] != null && typeof state.players[i][dataKeys[j]] == 'object') {
-								process_time = true;
-								field_label = "Время";
-								player_data = state.players[i][dataKeys[j]].time;
-								if (player_data == undefined) {
-									player_data = 0;
-								};
-							};
-							
-							// process the time or name
-							if (process_time == true) {
-								let date = new Date(player_data * 1000).toISOString().substr(11,8).split(":");
-								date = date[0] + ":" + date[1] + ":" + date[2];
-								player_datas += date;
-							} else {
-								player_data = player_data.replace(/_/g, " ");
-								for (let k = 0; k < player_data.length; k++) {
-									if (player_data[k] == "^") {
-										player_data = player_data.slice(0, k) + " " + player_data.slice(k+2);
-									};
-								};
-								// handle very long strings
-								player_data = (player_data.length > 24) ? player_data.substring(0, 24 - 3) + "..." : player_data;
-								let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
-								// new config entry for adding numbers to beginning of name list
-								if (config["server_enable_numbers"]) {
-									player_datas += j == 0 ? index +  " - " + player_data : player_data;
-								} else {
-									player_datas += player_data;
-								};
-								if (dataKeys[j] == "ping") player_datas += " ms";
-							};
+							// handle very long strings
+							player_data = (player_data.length > 24) ? player_data.substring(0, 24 - 3) + "..." : player_data;
+
+							field_value += player_data;
+
+						};
+						field_value += "\n";
+					};
+					field_value += "```";
+
+					embed.addField(field_label + ' :', field_value, true);
+				} else { //START
+					for (let j = 0; j < dataKeys.length && j < 2; j++) {
+						// check if data key empty
+						if (dataKeys[j] == "") {
+							dataKeys[j] = "\u200B";
 						};
 						
-						player_datas += "\n";
+						let player_datas = "```\n";
+						for (let i = 0; i < state.players.length; i++) {
+							// break if too many players, prevent discord message overflood
+							if (i + 1 > 64) {
+								if (j == 0) player_datas += "и еще " + (state.players.length - 50) + "...";
+								else player_datas += "...";
+								break;
+							};
+
+							// set player data
+							if (state.players[i][dataKeys[j]] != undefined) {
+								let player_data = null;
+								let process_time = false;
+								
+								// Player name field
+								if (typeof state.players[i][dataKeys[j]] == 'string') {
+									process_time = false;
+									field_label = "Ник";
+									player_data = state.players[i][dataKeys[j]].toString();
+									if (player_data == "") {
+										player_data = "*loading*";
+									};
+								};
+								
+								// Player time field
+								if (state.players[i][dataKeys[j]] != null && typeof state.players[i][dataKeys[j]] == 'object') {
+									process_time = true;
+									field_label = "Время";
+									player_data = state.players[i][dataKeys[j]].time;
+									if (player_data == undefined) {
+										player_data = 0;
+									};
+								};
+								
+								// process the time or name
+								if (process_time == true) {
+									let date = new Date(player_data * 1000).toISOString().substring(11,19).split(":");
+									date = date[0] + ":" + date[1]/*  + ":" + date[2] */;
+									player_datas += date;
+								} else {
+									player_data = player_data.replace(/_/g, " ");
+									for (let k = 0; k < player_data.length; k++) {
+										if (player_data[k] == "^") {
+											player_data = player_data.slice(0, k) + " " + player_data.slice(k+2);
+										};
+									};
+									// handle very long strings
+									player_data = (player_data.length > 24) ? player_data.substring(0, 24 - 3) + "..." : player_data;
+									let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
+									// new config entry for adding numbers to beginning of name list
+									if (config["server_enable_numbers"]) {
+										player_datas += j == 0 ? index +  " - " + player_data : player_data;
+									} else {
+										player_datas += player_data;
+									};
+									if (dataKeys[j] == "ping") player_datas += " ms";
+								};
+							};
+							
+							player_datas += "\n";
+						};
+						player_datas += "```";
+						dataKeys[j] = dataKeys[j].charAt(0).toUpperCase() + dataKeys[j].slice(1);
+						embed.addField(field_label + ' :', player_datas, true);
 					};
-					player_datas += "```";
-					dataKeys[j] = dataKeys[j].charAt(0).toUpperCase() + dataKeys[j].slice(1);
-					embed.addField(field_label + ' :', player_datas, true);
-				};
+				}; // END
 			};
 			
 			// set bot activity
@@ -464,7 +551,7 @@ var timeFormat = {
 	'year': 'HH:mm',
 };
 async function generateGraph() {
-	while(true){
+	while(client.token != null){ // client.token is not null if it's alive (logged in)
 		try {
 
 			// generate graph
@@ -478,7 +565,7 @@ async function generateGraph() {
 
 			let graph_labels = [];
 			let graph_datas = [];
-			
+				
 			// set data
 			for (let i = 0; i < data.length; i += 1) {
 				graph_labels.push(new Date(data[i]["x"]));
@@ -487,7 +574,7 @@ async function generateGraph() {
 
 			let graphConfig =  {
 				type: 'line',
-				
+					
 				data: {
 					labels: graph_labels,
 					datasets: [{
@@ -499,7 +586,7 @@ async function generateGraph() {
 						backgroundColor: hexToRgb(config["server_color"], 0.2),
 						borderColor: hexToRgb(config["server_color"], 1.0),
 						// borderWidth: 2, // lines width, for this dataset
-      					fill: true
+							fill: true
 					}]
 				},
 				
@@ -556,7 +643,6 @@ async function generateGraph() {
 					},
 					elements: {
 						line: {
-							tension: 0.2, // smooth out
 							borderWidth: 2 // line width
 						}
 					},
@@ -571,7 +657,7 @@ async function generateGraph() {
 			};
 
 			let graphFile = 'graph_' + instanceId + '.png';
-			
+				
 			canvasRenderService.renderToBuffer(graphConfig).then(data => {
 				fs.writeFileSync(__dirname + '/temp/graphs/' + graphFile, data);
 			}).catch(function(error) {
@@ -595,4 +681,4 @@ async function generateGraph() {
 function hexToRgb(hex, opacity) {
 	var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
 	return result ? "rgba(" + parseInt(result[1], 16) + ", " + parseInt(result[2], 16) + ", " + parseInt(result[3], 16) + ", " + opacity + ")" : null;
-}
+};

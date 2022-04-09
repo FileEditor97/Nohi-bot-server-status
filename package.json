@@ -1,12 +1,16 @@
 {
-  "name": "game-status",
-  "version": "1.0.0",
+  "name": "game-server-status",
+  "version": "1.1.0",
   "description": "discord bot",
+  "repository": "github:FileEditor97/Nohi-bot-server-status",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Ramzi Saheb (https://github.com/Ramzi-Sah)",
+  "contributors": [
+    "FileEditor97 (https://github.com/FileEditor97)"
+  ],
   "license": "GNU GPLv3",
   "dependencies": {
     "chartjs-adapter-date-fns": "^2.0.0",
@@ -15,5 +19,9 @@
     "discord.js": "^13.6.0",
     "dotenv": "^10.0.0",
     "gamedig": "^4.0.2"
+  },
+  "engines": {
+    "node": ">= 16.9.0",
+    "npm": ">= 8.0.0"
   }
 }

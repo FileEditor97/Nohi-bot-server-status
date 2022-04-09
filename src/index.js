@@ -1,6 +1,6 @@
 /*
 	Author: Ramzi Sah#2992
-	Fork by: GreenLord#0593
+	Fork by: FileEditor97
 	Desription:
 		creates multiple instances of the bot
 */

@@ -2,7 +2,10 @@
  Discord bot written in Node.js for providing continious status of game server - basic server information and player count (list and graph)
  This is based(fork) on selfhosted variant of "Game Status"/"Server Status" [bot](https://github.com/Ramzi-Sah/game-status-discordbot-selfhosted) by Ramzi-Sah.
 
-**NOTE: I'am not into javascript and therefor am not aware of it possibilities and "rules". Some changes may be incorrect, but this variant serves it purpose for me good.**
+**User interface translated to russian**
+**Интерфейс на русском**
+
+**NOTE: I'm not into javascript and therefor am not aware of it possibilities and "rules". Some changes may be incorrect, but this variant serves it purpose for me good.**
 **This repository may be left abandoned after some time as I'm planing on implementing it's features in other language.**
 
 ## Credits
@@ -27,19 +30,21 @@
 - Dependencies version set to latest (at the time of this message)
 - Graph "fixed" and customized for my needs
 - Graphs are uploaded directly from bot's source foulder, rather than thru web server (as I'm not into js)
-- **User interface translated to russian**
 - More setup fields in config
 - Removed unwanted code
 - Removed web-server as it's not required
+- Refresh button
+- (experimental) Playerlist format changed to more compact (especialy for viewing on mobile)
+- Timezone problem fixed, now it's more flexible for configuration.
 
 ## To-do List
-- Add bot shutdown(restart) command
+~- Add bot shutdown(restart) command~ (problematic)
 - Fix graph's element to look better(?)
-- Figure out what with timezones, summer time (they are a bit strangely implemented, resulting in time like 25:00 and further)
+~- Figure out what with timezones, summer time (they are a bit strangely implemented, resulting in time like 25:00 and further)~
 - Maintenance mode
 - (Possibly) Display other information about the server
-- Fix problem with image(graph) cutting off on mobile client
-- Option to toggle player data - time on server. Maybe change alltogether list to multiple collumns. 
+~- Fix problem with image(graph) cutting off on mobile client~
+~- Option to toggle player data - time on server. Maybe change alltogether list to multiple collumns. ~ (experimental for now)
 
 
 ## src/config.json
@@ -66,7 +71,8 @@
 			"server_url" : "", -server's URL like discord link or website, clickable on server's custom name
 			"server_color" : "#00FF00", -color which will be used on embed and graph, hex color
 			
-			"steam_btn" : true, -connect button below
+			"playerlist_experimental" : true, -experimental, new view for playerlist
+			"steam_connect_button" : true, -connect button below
 			"minimal" : false, -without sertain elements
 			"server_enable_playerlist" : true, -player list
 			"server_enable_graph" : true, -graph below player list

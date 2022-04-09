@@ -1,5 +1,5 @@
 {
-	"statusUpdateTime" : 60,
+	"statusUpdateTime" : 120,
 	"ownerID" : "",
 
 	"instances": [
@@ -20,7 +20,8 @@
 			"server_url" : "",
 			"server_color" : "#00FF00",
 			
-			"steam_btn" : true,
+			"playerlist_experimental" : true,
+			"steam_connect_button" : true,
 			"minimal" : false,
 			"server_enable_playerlist" : true,
 			"server_enable_graph" : true,
