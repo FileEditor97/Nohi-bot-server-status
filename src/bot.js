@@ -21,7 +21,7 @@ process.on('message', function(m) {
 		// send ok signal to main process
 		process.send({
 			instanceid : instanceId,
-			message : "instance started."
+			message : "Instance started."
 		});
 		
 		// init bot
@@ -86,23 +86,23 @@ client.on('ready', async () => {
 	};
 	
 	// get broadcast channel
-	let statusChannel = client.channels.cache.get(config["serverStatusChannelId"]);
+	let statusChannel = client.channels.cache.get(config["serverStatusChannelID"]);
 	
 	if (statusChannel == undefined) {
 		process.send({
 			instanceid : instanceId,
-			message : "ERROR: channel id " + config["serverStatusChannelId"] + ", does not exist."
+			message : "ERROR: Channel id \"" + config["serverStatusChannelID"] + "\" does not exist."
 		});
 		return;
 	};
 	
 	// get a status message
-	let statusMessage = await createStatusMessage(statusChannel);
+	let statusMessage = await getStatusMessage(statusChannel);
 	
 	if (statusMessage == undefined) {
 		process.send({
 			instanceid : instanceId,
-			message : "ERROR: could not send the status message."
+			message : "ERROR: Could not send the status message."
 		});
 		return;
 	};
@@ -117,21 +117,20 @@ client.on('ready', async () => {
 //----------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------
 // create/get last status message
-async function createStatusMessage(statusChannel) {
+async function getStatusMessage(statusChannel) {
 	// get last message
 	let statusMessage = await getLastMessage(statusChannel);
 	if (statusMessage != undefined) {
 		// return last message if exists
 		return statusMessage;
 	};
-	
 
 	// OR create new message
 	let embed = new MessageEmbed();
 	embed.setTitle("Запускаю панель...");
 	embed.setColor('#ffff00');
 	
-	return await statusChannel.send({ embeds: [embed] }).then((sentMessage)=> {
+	return await statusChannel.send({ embeds: [embed] }).then((sentMessage) => {
 		return sentMessage;
 	});	
 };
@@ -176,14 +175,15 @@ async function startStatusMessage(statusMessage) {
 			let embed = await generateStatusEmbed();
 			statusMessage.edit({ embeds: [embed], components: [row],
 				files: config["server_enable_graph"] ? [new MessageAttachment(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
-			}).then(() => setTimeout(6000).finally(() => {
+			}).then(() => setTimeout(10000).finally(() => {
 				row.components[0].setDisabled(false);
 				statusMessage.edit({components: [row]});
 			}));
 		} catch (error) {
+			console.error(error);
 			process.send({
 				instanceid : instanceId,
-				message : "ERROR: could not edit status message. " + error
+				message : "ERROR: Could not edit status message. "
 			});
 		};
 
@@ -192,7 +192,10 @@ async function startStatusMessage(statusMessage) {
 };
 
 client.once('reconnecting', c => {
-	console.log(`[%d] 🔃 Reconnecting...`, instanceId);
+	process.send({
+		instanceid : instanceId,
+		message : "🔃 Reconnecting..."
+	});
 });
 
 client.on('interactionCreate', interaction => {
@@ -219,7 +222,7 @@ client.on('messageCreate', async msg => {
 				client.user.setActivity("Shutting down...", { type: 'PLAYING' });
 				process.send({
 					instanceid : instanceId,
-					message : "instance shutting down."
+					message : "Instance shutting down."
 				});
 				client.destroy();
 			});
@@ -321,140 +324,76 @@ function generateStatusEmbed() {
 					e !== 'id' && 
 					e !== 'team' &&
 					e !== 'squad' &&
-					// e !== 'raw' && // need to parse raw data, time and score
+					// e !== 'raw' && // need to parse raw data -> time and score
 					e !== 'skin'
 				);
 				
 				// declare field label
-				let field_label = "";
-				
-				if (config["playerlist_experimental"]) {
-					field_label = "Время и Ник";
-					let field_value = "```\n";
-					for (let i = 0; i < state.players.length; i++) {
-						// break if too many players, prevent discord message overflood
-						if (i + 1 > 64) {
-							field_value += "и еще " + (state.players.length - 64) + "...";
-							break;
-						}
+				let field_label = "Время и Ник";
 
-						// set player data
-						if (state.players[i]['name'] != undefined) {
-							let player_data = null;
+				let fields = [];
+				let j = 0;
+				fields[j] = "```\n";
+				for (let i = 0; i < state.players.length; i++) {
+					// devides playerlist into multiple fields if character limit reached for one field
+					if ((i + 1 - j * 30) > 30) {
+						fields[j] += "```";
+						j++;
+						fields[j] = "```\n";
+						/* field_value += "и еще " + (state.players.length - 64) + "...";
+						break; */
+					}
 
-							// adding numbers to beginning of name list
-							let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
-							if (config["server_enable_numbers"]) {
-								field_value += index + '. ';
-							};
+					// set player data
+					if (state.players[i]['name'] != undefined) {
+						let player_data = null;
 
-							// player time data
-							player_data = state.players[i]['raw'].time;
-							if (player_data == undefined) {
-								player_data = 0;
-							};
-							// process time
-							let date = new Date(player_data * 1000).toISOString().substring(11,19).split(":");
-							date = date[0] + ":" + date[1];
-							field_value += date;
-
-							field_value += " | "
-
-							// player name data
-							player_data = state.players[i]['name'];
-							if (player_data == "") {
-								player_data = "*loading*";
-							};
-							// process name
-							for (let k = 0; k < player_data.length; k++) {
-								if (player_data[k] == "^") {
-									player_data = player_data.slice(0, k) + " " + player_data.slice(k+2);
-								};
-							};
-							// handle very long strings
-							player_data = (player_data.length > 24) ? player_data.substring(0, 24 - 3) + "..." : player_data;
-
-							field_value += player_data;
-
+						// adding numbers to beginning of name list
+						let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
+						if (config["server_enable_numbers"]) {
+							fields[j] += index + '〕';
 						};
-						field_value += "\n";
+
+						// player time data
+						player_data = state.players[i]['raw'].time;
+						if (player_data == undefined) {
+							player_data = 0;
+						};
+						// process time
+						let date = new Date(player_data * 1000).toISOString().substring(11,19).split(":");
+						date = date[0] + ":" + date[1];
+						fields[j] += date;
+
+						fields[j] += "｜"
+
+						// player name data
+						player_data = state.players[i]['name'];
+						if (player_data == "") {
+							player_data = "*loading*";
+						};
+						// process name
+						for (let k = 0; k < player_data.length; k++) {
+							if (player_data[k] == "^") {
+								player_data = player_data.slice(0, k) + " " + player_data.slice(k+2);
+							};
+						};
+						// handle very long strings
+						// maximum char. for every field is 1024, this implimentation reaches ~1000
+						// 7 chars for brackets and 32 (9+22+1) per line
+						player_data = (player_data.length > 22) ? player_data.substring(0, 22 - 3) + "..." : player_data;
+
+						fields[j] += player_data;
+
 					};
-					field_value += "```";
+					fields[j] += "\n";
+				};
+				fields[j] += "```";
 
-					embed.addField(field_label + ' :', field_value, true);
-				} else { //START
-					for (let j = 0; j < dataKeys.length && j < 2; j++) {
-						// check if data key empty
-						if (dataKeys[j] == "") {
-							dataKeys[j] = "\u200B";
-						};
-						
-						let player_datas = "```\n";
-						for (let i = 0; i < state.players.length; i++) {
-							// break if too many players, prevent discord message overflood
-							if (i + 1 > 64) {
-								if (j == 0) player_datas += "и еще " + (state.players.length - 50) + "...";
-								else player_datas += "...";
-								break;
-							};
-
-							// set player data
-							if (state.players[i][dataKeys[j]] != undefined) {
-								let player_data = null;
-								let process_time = false;
-								
-								// Player name field
-								if (typeof state.players[i][dataKeys[j]] == 'string') {
-									process_time = false;
-									field_label = "Ник";
-									player_data = state.players[i][dataKeys[j]].toString();
-									if (player_data == "") {
-										player_data = "*loading*";
-									};
-								};
-								
-								// Player time field
-								if (state.players[i][dataKeys[j]] != null && typeof state.players[i][dataKeys[j]] == 'object') {
-									process_time = true;
-									field_label = "Время";
-									player_data = state.players[i][dataKeys[j]].time;
-									if (player_data == undefined) {
-										player_data = 0;
-									};
-								};
-								
-								// process the time or name
-								if (process_time == true) {
-									let date = new Date(player_data * 1000).toISOString().substring(11,19).split(":");
-									date = date[0] + ":" + date[1]/*  + ":" + date[2] */;
-									player_datas += date;
-								} else {
-									player_data = player_data.replace(/_/g, " ");
-									for (let k = 0; k < player_data.length; k++) {
-										if (player_data[k] == "^") {
-											player_data = player_data.slice(0, k) + " " + player_data.slice(k+2);
-										};
-									};
-									// handle very long strings
-									player_data = (player_data.length > 24) ? player_data.substring(0, 24 - 3) + "..." : player_data;
-									let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
-									// new config entry for adding numbers to beginning of name list
-									if (config["server_enable_numbers"]) {
-										player_datas += j == 0 ? index +  " - " + player_data : player_data;
-									} else {
-										player_datas += player_data;
-									};
-									if (dataKeys[j] == "ping") player_datas += " ms";
-								};
-							};
-							
-							player_datas += "\n";
-						};
-						player_datas += "```";
-						dataKeys[j] = dataKeys[j].charAt(0).toUpperCase() + dataKeys[j].slice(1);
-						embed.addField(field_label + ' :', player_datas, true);
-					};
-				}; // END
+				// add fields to embed
+				embed.addField(field_label + ' :', fields[0], false);
+				for (let i = 1; i < fields.length; i++) {
+					embed.addField('\u200B', fields[i], false);
+				};
 			};
 			
 			// set bot activity
@@ -486,7 +425,11 @@ function generateStatusEmbed() {
 			return embed;
 		});
 	} catch (error) {
-		console.log(error);
+		console.error(error);
+		process.send({
+			instanceid : instanceId,
+			message : "ERROR: Failed at querying the server."
+		});
 		
 		// set bot activity
 		client.user.setActivity("❌ Оффлайн.", { type: 'WATCHING' });
@@ -516,8 +459,11 @@ function graphDataPush(time, nbrPlayers) {
 		try {
 			json = JSON.parse(data);
 		} catch (err) {
-			console.log("error on graph data")
-			console.error(err)
+			console.error(error);
+			process.send({
+				instanceid : instanceId,
+				message : "ERROR: Could not parse/read JSON data."
+			});
 			json = JSON.parse("[]");
 		};
 		
@@ -585,17 +531,19 @@ async function generateGraph() {
 						
 						backgroundColor: hexToRgb(config["server_color"], 0.2),
 						borderColor: hexToRgb(config["server_color"], 1.0),
-						// borderWidth: 2, // lines width, for this dataset
-							fill: true
+
+						fill: true,
+						spanGaps: true // enable for a single dataset
 					}]
 				},
 				
 				options: {
-					downsample: {
-						enabled: true,
-						threshold: 500 // max number of points to display per dataset
-					},
 					plugins: {
+						decimation: {
+							enabled: true,
+							algorithm: 'lttb',
+							samples: 500
+						},
 						legend: {
 							display: true,
 							labels: {
@@ -642,6 +590,9 @@ async function generateGraph() {
 						normalized: true
 					},
 					elements: {
+						point: {
+							radius: 0	
+						},
 						line: {
 							borderWidth: 2 // line width
 						}
@@ -661,15 +612,18 @@ async function generateGraph() {
 			canvasRenderService.renderToBuffer(graphConfig).then(data => {
 				fs.writeFileSync(__dirname + '/temp/graphs/' + graphFile, data);
 			}).catch(function(error) {
-				console.error("graph creation for guild " + instanceId + " failed.");
 				console.error(error);
+				process.send({
+					instanceid : instanceId,
+					message : "ERROR: Graph rendering failed."
+				});
 			});
 
 		} catch (error) {
 			console.error(error);
 			process.send({
 				instanceid : instanceId,
-				message : "could not generate graph image " + error
+				message : "ERROR: Could not generate graph image."
 			});
 		};
 

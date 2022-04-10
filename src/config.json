@@ -20,7 +20,6 @@
 			"server_url" : "",
 			"server_color" : "#00FF00",
 			
-			"playerlist_experimental" : true,
 			"steam_connect_button" : true,
 			"minimal" : false,
 			"server_enable_playerlist" : true,
