@@ -49,6 +49,7 @@ This bot is for self-hosting and may/will not work for huge amount of data. Sour
 - (Possibly) Display other information about the server
 - ~Fix problem with image(graph) cutting off on mobile client~
 - ~Option to toggle player data - time on server. Maybe change alltogether list to multiple collumns. ~
+- Fix unballanced data addition to json when refresh button is called (data must be saved with stable interval)
 
 
 ## src/config.json

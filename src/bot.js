@@ -174,7 +174,7 @@ async function startStatusMessage(statusMessage) {
 		
 			let embed = await generateStatusEmbed();
 			statusMessage.edit({ embeds: [embed], components: [row],
-				files: config["server_enable_graph"] ? [new MessageAttachment(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
+				files: (config["server_enable_graph"] && embed.image != null) ? [new MessageAttachment(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
 			}).then(() => setTimeout(10000).finally(() => {
 				row.components[0].setDisabled(false);
 				statusMessage.edit({components: [row]});
