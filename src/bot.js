@@ -185,7 +185,6 @@ async function startStatusMessage(statusMessage) {
 						.setEmoji('📊')
 						.setLabel('Показать список игроков')
 						.setStyle('SUCCESS')
-						.setDisabled()
 				)
 			}
 		
@@ -194,7 +193,7 @@ async function startStatusMessage(statusMessage) {
 				files: (config["server_enable_graph"] && embed.image != null) ? [new MessageAttachment(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
 			}).then(() => setTimeout(10000).finally(() => {
 				row.components[0].setDisabled(false);
-				statusMessage.edit({components: [row]});
+				statusMessage.edit({ components: [row] });
 			}));
 		} catch (error) {
 			console.error('['+instanceId+'] ERROR at editing status message: ', error);
@@ -224,8 +223,7 @@ client.on('interactionCreate', interaction => {
 
 	//  playerlist button
 	else if (interaction.customId == 'playerlist') {
-		interaction.deferUpdate({ ephemeral: true });
-		gamedig.query({
+		return gamedig.query({
 			type: config["server_type"],
 			host: config["server_host"],
 			port: config["server_port"],
@@ -239,11 +237,11 @@ client.on('interactionCreate', interaction => {
 			embed.setTitle('Список игроков ('+state.players.length + "/" + state.maxplayers+'):');
 			embed.setColor(config["server_color"]);
 
-			embed = getPlayerlist(state, embed);
+			embed = getPlayerlist(state, embed, true);
 
-			interaction.reply({ embeds: [embed] });
+			interaction.reply({ embeds: [embed], ephemeral: true });
 		}).catch(function(error) {
-			interaction.reply({ content: "Could not get playerlist. Report to bot's owner!" });
+			interaction.reply({ content: "Could not get playerlist. Report to bot's owner!", ephemeral: true });
 		});
 	}
 
@@ -274,7 +272,7 @@ function generateStatusEmbed() {
 	embed.setFooter({ text: 'Время сервера : ' + serverTime + '\n' + ticEmojy + ' ' + "Последнее обновление" });
 	
 	// query gamedig
-	gamedig.query({
+	return gamedig.query({
 		type: config["server_type"],
 		host: config["server_host"],
 		port: config["server_port"],
@@ -322,7 +320,7 @@ function generateStatusEmbed() {
 			
 		// player list
 		if (config["server_playerlist"] == "2" && state.players.length > 0) {
-			embed = getPlayerlist(state, embed);
+			embed = getPlayerlist(state, embed, false);
 		};
 			
 		// set bot activity
@@ -338,7 +336,7 @@ function generateStatusEmbed() {
 			);
 		};
 
-		return embed;
+		return embed
 	}).catch(function(error) {
 		console.error('['+instanceId+'] ERROR at quering the server: ', error);
 		process.send({
@@ -356,11 +354,11 @@ function generateStatusEmbed() {
 		// add graph data
 		graphDataPush(time, 0);
 
-		return embed;
+		return embed
 	});
 };
 
-function getPlayerlist(state, embed) {
+function getPlayerlist(state, embed, inline) {
 	// recover game data
 	let dataKeys = Object.keys(state.players[0]);
 			
@@ -444,9 +442,9 @@ function getPlayerlist(state, embed) {
 	fields[j] += "```";
 
 	// add fields to embed
-	embed.addField(field_label + ' :', fields[0], false);
+	embed.addField(field_label + ' :', fields[0], inline);
 	for (let i = 1; i < fields.length; i++) {
-		embed.addField('\u200B', fields[i], false);
+		embed.addField('\u200B', fields[i], inline);
 	};
 
 	return embed;
