@@ -32,7 +32,6 @@ process.on('message', function(m) {
 function init() {
 	// get config
 	config["instances"][instanceId]["statusUpdateTime"] = config["statusUpdateTime"];
-	config["instances"][instanceId]["ownerID"] = config["ownerID"];
 	config = config["instances"][instanceId];
 	
 	// connect to discord API
@@ -64,10 +63,7 @@ require('dotenv').config();
 const {Client, MessageEmbed, MessageAttachment, Intents, MessageActionRow, MessageButton} = require('discord.js');
 const client = new Client({
 	messageEditHistoryMaxSize: 0,
-	intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.DIRECT_MESSAGES],
-    partials: [
-        'CHANNEL', // Required to receive DMs
-    ]
+	intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES]
 });
 
 //----------------------------------------------------------------------------------------------------------
@@ -157,6 +153,12 @@ function getLastMessage(statusChannel) {
 // main loops
 async function startStatusMessage(statusMessage) {
 	while(client.token != null){ // client.token is not null if it's alive (logged in)
+		require('dns').resolve('www.discord.com', function(err) {
+			if (err) {
+				console.log("Lost connection to Discord");
+				process.exit(1);
+			}
+		});
 		try {
 			// steam link and refresh button button
 			let row = new MessageActionRow()
@@ -195,10 +197,10 @@ async function startStatusMessage(statusMessage) {
 				statusMessage.edit({components: [row]});
 			}));
 		} catch (error) {
-			console.error(error);
+			console.error('['+instanceId+'] ERROR at editing status message: ', error);
 			process.send({
 				instanceid : instanceId,
-				message : "ERROR: Could not edit status message. "
+				message : "ERROR: Could not edit status message."
 			});
 		};
 
@@ -245,24 +247,6 @@ client.on('interactionCreate', interaction => {
 		});
 	}
 
-});
-
-// DM's listener
-client.on('messageCreate', async msg => {
-	if (msg.author.bot) return;
-
-	if (msg.channel.type == "DM" && msg.content == "shutdown") {
-		if (msg.author.id == config["ownerID"]) {
-			await msg.channel.send("Shutting down...").then(m => {
-				client.user.setActivity("Shutting down...", { type: 'PLAYING' });
-				process.send({
-					instanceid : instanceId,
-					message : "Instance shutting down."
-				});
-				client.destroy();
-			});
-		}
-	}
 });
 
 
@@ -356,7 +340,7 @@ function generateStatusEmbed() {
 
 		return embed;
 	}).catch(function(error) {
-		console.error(error);
+		console.error('['+instanceId+'] ERROR at quering the server: ', error);
 		process.send({
 			instanceid : instanceId,
 			message : "ERROR: Failed at querying the server."
@@ -482,7 +466,7 @@ function graphDataPush(time, nbrPlayers) {
 		try {
 			json = JSON.parse(data);
 		} catch (err) {
-			console.error(error);
+			console.error('['+instanceId+'] ERROR at reading JSON data: ', error);
 			process.send({
 				instanceid : instanceId,
 				message : "ERROR: Could not parse/read JSON data."
@@ -635,7 +619,7 @@ async function generateGraph() {
 			canvasRenderService.renderToBuffer(graphConfig).then(data => {
 				fs.writeFileSync(__dirname + '/temp/graphs/' + graphFile, data);
 			}).catch(function(error) {
-				console.error(error);
+				console.error('['+instanceId+'] ERROR at rendering graph: ', error);
 				process.send({
 					instanceid : instanceId,
 					message : "ERROR: Graph rendering failed."
@@ -643,7 +627,7 @@ async function generateGraph() {
 			});
 
 		} catch (error) {
-			console.error(error);
+			console.error('['+instanceId+'] ERROR at generating graph image: ', error);
 			process.send({
 				instanceid : instanceId,
 				message : "ERROR: Could not generate graph image."

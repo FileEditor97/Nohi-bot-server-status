@@ -8,6 +8,10 @@
 //---------------------------------------------------------------------------------------------------
 // read configs
 const fs = require('fs');
+if (!fs.existsSync(__dirname + '/config.json')) {
+	console.warn("Config file not found! Check README.md for config.json file and place it in '"+__dirname+"' folder.");
+	process.exit(0);
+}
 const config = JSON.parse(fs.readFileSync(__dirname + '/config.json', 'utf8'));
 
 // create temp data folders
@@ -21,6 +25,16 @@ if (!fs.existsSync(__dirname + "/temp/data")){
     fs.mkdirSync(__dirname + "/temp/data");
 };
 
+// resolve discord.com
+require('dns').resolve('www.discord.com', function(err) {
+	if (err) {
+		console.log("No connection to Discord");
+		process.exit(1);
+	} else {
+		console.log("Connected to Discord");
+	}
+});
+
 // initiation
 const ChildProcess = require('child_process');
 var instances = [];
@@ -33,7 +47,7 @@ for (let i = 0; i < config["instances"].length; i++) {
 	let instance = ChildProcess.fork(__dirname + '/bot.js');
 	
 	instance.on('message', function(m) {
-		console.log('[instance ' + m.instanceid + ']:', m.message);
+		console.log('[' + Date.now() + '][inst ' + m.instanceid + ']:', m.message);
 	});
 	
 	// communicate id to instance
