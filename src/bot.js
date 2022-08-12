@@ -42,8 +42,6 @@ function init() {
 
 //----------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------------
 // common
 const { setTimeout } = require('timers/promises');
 function Sleep(ms) {
@@ -114,7 +112,14 @@ client.on('ready', async () => {
 	generateGraph(); // needs it's own loop, as graph is generated only once every minute
 });
 
-//----------------------------------------------------------------------------------------------------------
+client.once('reconnecting', c => {
+	process.send({
+		instanceid : instanceId,
+		message : "🔃 Reconnecting..."
+	});
+});
+
+
 //----------------------------------------------------------------------------------------------------------
 // create/get last status message
 async function getStatusMessage(statusChannel) {
@@ -147,7 +152,7 @@ function getLastMessage(statusChannel) {
 	});
 };
 
-//----------------------------------------------------------------------------------------------------------
+
 //----------------------------------------------------------------------------------------------------------
 // main loops
 async function startStatusMessage(statusMessage) {
@@ -171,6 +176,16 @@ async function startStatusMessage(statusMessage) {
 						.setStyle('PRIMARY')
 				);
 			}
+			if (config["server_playerlist"] == "1") {
+				row.addComponents(
+					new MessageButton()
+						.setCustomId('playerlist')
+						.setEmoji('📊')
+						.setLabel('Показать список игроков')
+						.setStyle('SUCCESS')
+						.setDisabled()
+				)
+			}
 		
 			let embed = await generateStatusEmbed();
 			statusMessage.edit({ embeds: [embed], components: [row],
@@ -191,23 +206,43 @@ async function startStatusMessage(statusMessage) {
 	};
 };
 
-client.once('reconnecting', c => {
-	process.send({
-		instanceid : instanceId,
-		message : "🔃 Reconnecting..."
-	});
-});
-
 client.on('interactionCreate', interaction => {
 	if (!interaction.isButton()) return;
 
 	// Check for CustomID
+	//  connect button
 	if (interaction.customId == 'steamLink')
 		interaction.reply({ content: 'steam://connect/' + config["server_host"] + ':' + config["server_port"], ephemeral: true })
 
+	//  refresh button
 	else if (interaction.customId == 'refresh') {
 		interaction.deferUpdate();
 		cancelTimeout.abort();
+	}
+
+	//  playerlist button
+	else if (interaction.customId == 'playerlist') {
+		interaction.deferUpdate({ ephemeral: true });
+		gamedig.query({
+			type: config["server_type"],
+			host: config["server_host"],
+			port: config["server_port"],
+
+			maxAttempts: 3,
+			socketTimeout: 1000,
+			debug: false
+		}).then((state) => {
+			let embed = new MessageEmbed();
+
+			embed.setTitle('Список игроков ('+state.players.length + "/" + state.maxplayers+'):');
+			embed.setColor(config["server_color"]);
+
+			embed = getPlayerlist(state, embed);
+
+			interaction.reply({ embeds: [embed] });
+		}).catch(function(error) {
+			interaction.reply({ content: "Could not get playerlist. Report to bot's owner!" });
+		});
 	}
 
 });
@@ -233,7 +268,6 @@ client.on('messageCreate', async msg => {
 
 
 //----------------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------------
 // fetch data
 const gamedig = require('gamedig');
 var tic = false;
@@ -256,184 +290,81 @@ function generateStatusEmbed() {
 	embed.setFooter({ text: 'Время сервера : ' + serverTime + '\n' + ticEmojy + ' ' + "Последнее обновление" });
 	
 	// query gamedig
-	try {
-		return gamedig.query({
-			type: config["server_type"],
-			host: config["server_host"],
-			port: config["server_port"],
+	gamedig.query({
+		type: config["server_type"],
+		host: config["server_host"],
+		port: config["server_port"],
 
-			maxAttempts: 5,
-			socketTimeout: 1000,
-			debug: false
-		}).then((state) => {
-			// set embed color
-			embed.setColor(config["server_color"]);
+		maxAttempts: 5,
+		socketTimeout: 1000,
+		debug: false
+	}).then((state) => {
+		// set embed color
+		embed.setColor(config["server_color"]);
 
-			//-----------------------------------------------------------------------------------------------
-			// set server name
-			let serverName = config["server_name"];
-			// OR get servername from gamedig
-			//let serverName = state.name;
+		// set server name
+		let serverName = config["server_name"];
+		// OR get servername from gamedig
+		//let serverName = state.name;
 			
-			// refactor server name
-			for (let i = 0; i < serverName.length; i++) {
-				if (serverName[i] == "^") {
-					serverName = serverName.slice(0, i) + " " + serverName.slice(i+2);
-				} else if (serverName[i] == "█") {
-					serverName = serverName.slice(0, i) + " " + serverName.slice(i+1);
-				} else if (serverName[i] == "�") {
-					serverName = serverName.slice(0, i) + " " + serverName.slice(i+2);
-				};
+		// refactor server name
+		for (let i = 0; i < serverName.length; i++) {
+			if (serverName[i] == "^") {
+				serverName = serverName.slice(0, i) + " " + serverName.slice(i+2);
+			} else if (serverName[i] == "█") {
+				serverName = serverName.slice(0, i) + " " + serverName.slice(i+1);
+			} else if (serverName[i] == "�") {
+				serverName = serverName.slice(0, i) + " " + serverName.slice(i+2);
 			};
+		};
 			
-			// server name field
-			embed.addField("Название сервера" + ' :', serverName);
-			//-----------------------------------------------------------------------------------------------
-			// basic server info
-			if (!config["minimal"]) {
-				embed.addField("Прямое подключение" + ' :', "`" + state.connect + "`", true);
-				embed.addField("Режим игры" + ' :', config["server_type"] , true);
-				if (state.map == "") {
-					embed.addField("\u200B", "\u200B", true);
-				} else {
-					embed.addField("Карта" + ' :', state.map, true);
-				};
+		// server name field
+		embed.addField("Название сервера" + ' :', serverName);
+
+		// basic server info
+		if (!config["minimal"]) {
+			embed.addField("Прямое подключение" + ' :', "`" + state.connect + "`", true);
+			embed.addField("Режим игры" + ' :', (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), true);
+			if (state.map == "") {
+				embed.addField("\u200B", "\u200B", true);
+			} else {
+				embed.addField("Карта" + ' :', state.map, true);
 			};
+		};
 
-			embed.addField("Статус" + ' :', "✅ " + "Онлайн", true);
-			embed.addField("Кол-во игроков" + ' :', state.players.length + "/" + state.maxplayers, true);
-			embed.addField('\u200B', '\u200B', true);
+		embed.addField("Статус" + ' :', "✅ " + "Онлайн", true);
+		embed.addField("Кол-во игроков" + ' :', state.players.length + "/" + state.maxplayers, true);
+		embed.addField('\u200B', '\u200B', true);
 			
-			//-----------------------------------------------------------------------------------------------
-			// player list
-			if (config["server_enable_playerlist"] && state.players.length > 0) {
-				// recover game data
-				let dataKeys = Object.keys(state.players[0]);
-				
-				// set name as first
-				if (dataKeys.includes('name')) {
-					dataKeys = dataKeys.filter(e => e !== 'name');
-					dataKeys.splice(0, 0, 'name');
-				};
-				
-				// remove some unwanted data
-				dataKeys = dataKeys.filter(e => 
-					e !== 'frags' && 
-					e !== 'score' && 
-					e !== 'guid' && 
-					e !== 'id' && 
-					e !== 'team' &&
-					e !== 'squad' &&
-					// e !== 'raw' && // need to parse raw data -> time and score
-					e !== 'skin'
-				);
-				
-				// declare field label
-				let field_label = "Время и Ник";
-
-				let fields = [];
-				let j = 0;
-				fields[j] = "```\n";
-				for (let i = 0; i < state.players.length; i++) {
-					// devides playerlist into multiple fields if character limit reached for one field
-					if ((i + 1 - j * 30) > 30) {
-						fields[j] += "```";
-						j++;
-						fields[j] = "```\n";
-						/* field_value += "и еще " + (state.players.length - 64) + "...";
-						break; */
-					}
-
-					// set player data
-					if (state.players[i]['name'] != undefined) {
-						let player_data = null;
-
-						// adding numbers to beginning of name list
-						let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
-						if (config["server_enable_numbers"]) {
-							fields[j] += index + '〕';
-						};
-
-						// player time data
-						player_data = state.players[i]['raw'].time;
-						if (player_data == undefined) {
-							player_data = 0;
-						};
-						// process time
-						let date = new Date(player_data * 1000).toISOString().substring(11,19).split(":");
-						date = date[0] + ":" + date[1];
-						fields[j] += date;
-
-						fields[j] += "｜"
-
-						// player name data
-						player_data = state.players[i]['name'];
-						if (player_data == "") {
-							player_data = "*loading*";
-						};
-						// process name
-						for (let k = 0; k < player_data.length; k++) {
-							if (player_data[k] == "^") {
-								player_data = player_data.slice(0, k) + " " + player_data.slice(k+2);
-							};
-						};
-						// handle very long strings
-						// maximum char. for every field is 1024, this implimentation reaches ~1000
-						// 7 chars for brackets and 32 (9+22+1) per line
-						player_data = (player_data.length > 22) ? player_data.substring(0, 22 - 3) + "..." : player_data;
-
-						fields[j] += player_data;
-
-					};
-					fields[j] += "\n";
-				};
-				fields[j] += "```";
-
-				// add fields to embed
-				embed.addField(field_label + ' :', fields[0], false);
-				for (let i = 1; i < fields.length; i++) {
-					embed.addField('\u200B', fields[i], false);
-				};
-			};
+		// player list
+		if (config["server_playerlist"] == "2" && state.players.length > 0) {
+			embed = getPlayerlist(state, embed);
+		};
 			
-			// set bot activity
-			client.user.setActivity("✅ Онлайн: " + state.players.length + "/" + state.maxplayers, { type: 'WATCHING' });
+		// set bot activity
+		client.user.setActivity("✅ Онлайн: " + state.players.length + "/" + state.maxplayers, { type: 'WATCHING' });
 
-			// add graph data
-			graphDataPush(time, state.players.length);
+		// add graph data
+		graphDataPush(time, state.players.length);
 
-			// set graph image
-			if (config["server_enable_graph"]) {
-				embed.setImage(
-					"attachment://graph_" + instanceId + ".png"
-				);
-			};
+		// set graph image
+		if (config["server_enable_graph"]) {
+			embed.setImage(
+				"attachment://graph_" + instanceId + ".png"
+			);
+		};
 
-			return embed;
-		}).catch(function(error) {
-			
-			// set bot activity
-			client.user.setActivity("❌ Оффлайн.", { type: 'WATCHING' });
-	
-			// offline status message
-			embed.setColor('#ff0000');
-			embed.setTitle('❌ ' + "Сервен оффлайн" + '.');
-
-			// add graph data
-			graphDataPush(time, 0);
-
-			return embed;
-		});
-	} catch (error) {
+		return embed;
+	}).catch(function(error) {
 		console.error(error);
 		process.send({
 			instanceid : instanceId,
 			message : "ERROR: Failed at querying the server."
 		});
-		
+			
 		// set bot activity
 		client.user.setActivity("❌ Оффлайн.", { type: 'WATCHING' });
-		
+	
 		// offline status message
 		embed.setColor('#ff0000');
 		embed.setTitle('❌ ' + "Сервен оффлайн" + '.');
@@ -442,7 +373,99 @@ function generateStatusEmbed() {
 		graphDataPush(time, 0);
 
 		return embed;
+	});
+};
+
+function getPlayerlist(state, embed) {
+	// recover game data
+	let dataKeys = Object.keys(state.players[0]);
+			
+	// set name as first
+	if (dataKeys.includes('name')) {
+		dataKeys = dataKeys.filter(e => e !== 'name');
+		dataKeys.splice(0, 0, 'name');
 	};
+	
+	// remove some unwanted data
+	dataKeys = dataKeys.filter(e => 
+		e !== 'frags' && 
+		e !== 'score' && 
+		e !== 'guid' && 
+		e !== 'id' && 
+		e !== 'team' &&
+		e !== 'squad' &&
+		// e !== 'raw' && // need to parse raw data -> time and score
+		e !== 'skin'
+	);
+		
+	// declare field label
+	let field_label = "Время и Ник";
+
+	let fields = [];
+	let j = 0;
+	fields[j] = "```\n";
+	for (let i = 0; i < state.players.length; i++) {
+		// devides playerlist into multiple fields if character limit reached for one field
+		if ((i + 1 - j * 30) > 30) {
+			fields[j] += "```";
+			j++;
+			fields[j] = "```\n";
+			/* field_value += "и еще " + (state.players.length - 64) + "...";
+			break; */
+		}
+
+		// set player data
+		if (state.players[i]['name'] != undefined) {
+			let player_data = null;
+
+			// adding numbers to beginning of name list
+			let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
+			if (config["server_enable_numbers"]) {
+				fields[j] += index + '〕';
+			};
+
+			// player time data
+			player_data = state.players[i]['raw'].time;
+			if (player_data == undefined) {
+				player_data = 0;
+			};
+			// process time
+			let date = new Date(player_data * 1000).toISOString().substring(11,19).split(":");
+			date = date[0] + ":" + date[1];
+			fields[j] += date;
+
+			fields[j] += "｜"
+
+			// player name data
+			player_data = state.players[i]['name'];
+			if (player_data == "") {
+				player_data = "*loading*";
+			};
+			// process name
+			for (let k = 0; k < player_data.length; k++) {
+				if (player_data[k] == "^") {
+					player_data = player_data.slice(0, k) + " " + player_data.slice(k+2);
+				};
+			};
+			// handle very long strings
+			// maximum char. for every field is 1024, this implimentation reaches ~1000
+			// 7 chars for brackets and 32 (9+22+1) per line
+			player_data = (player_data.length > 22) ? player_data.substring(0, 22 - 3) + "..." : player_data;
+
+			fields[j] += player_data;
+
+		};
+		fields[j] += "\n";
+	};
+	fields[j] += "```";
+
+	// add fields to embed
+	embed.addField(field_label + ' :', fields[0], false);
+	for (let i = 1; i < fields.length; i++) {
+		embed.addField('\u200B', fields[i], false);
+	};
+
+	return embed;
 };
 
 function graphDataPush(time, nbrPlayers) {

@@ -19,10 +19,11 @@
 			"server_logo" : "",
 			"server_url" : "",
 			"server_color" : "#00FF00",
+			"server_gamemode": "",
 			
 			"steam_connect_button" : true,
 			"minimal" : false,
-			"server_enable_playerlist" : true,
+			"server_playerlist" : "0",
 			"server_enable_graph" : true,
 			"server_enable_numbers" : false
 		}

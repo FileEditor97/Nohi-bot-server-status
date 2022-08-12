@@ -14,6 +14,14 @@ This bot is for self-hosting and may/will not work for huge amount of data. Sour
 - [Ramzi-Sah](https://github.com/Ramzi-Sah) for creating the original bot
 - [TheProKoen](https://github.com/TheProKoen) and [rizkychi](https://github.com/rizkychi) for inspiration
 
+## Contacts
+**Discord:** GreenLord#0593
+
+## WIKI
+https://github.com/FileEditor97/Nohi-bot-server-status/wiki
+
+
+# *English description*
 
 ## Requirements
 - Node.js and NPM (latest stable version)
@@ -27,8 +35,6 @@ This bot is for self-hosting and may/will not work for huge amount of data. Sour
 4. Configure bot by editing file `src/config.json` in any text editor or terminal (unix - using `nano src/config.json`). *See below*
 5. Run bot using command `node src/index.js` or in background with `node src/index.js &`
 
-## WIKI
-https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 
 ## Changes by FileEditor
 - Dependencies version set to latest (at the time of this message)
@@ -41,13 +47,44 @@ https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 - Playerlist format changed to more compact (especialy for viewing on mobile)
 - Timezone problem fixed, now it's more flexible for configuration.
 - Playerlist displays every player (maximum of 25*30 = 750)
+- Button for displaying playerlist and option
 
 ## To-do List
 - ~Add bot shutdown(restart) command~ (problematic)
 - ~Fix graph's element to look better(?)~ (optimization)
 - ~Figure out what with timezones, summer time (they are a bit strangely implemented, resulting in time like 25:00 and further)~
 - Maintenance mode
-- (Possibly) Display other information about the server
+- ~(Possibly) Display other information about the server~
 - ~Fix problem with image(graph) cutting off on mobile client~
 - ~Option to toggle player data - time on server. Maybe change alltogether list to multiple collumns.~
 - Fix unballanced data addition to json when refresh button is called (data must be saved with stable interval)
+- ~Button for displaying players on server and fix some elements~
+
+
+# *Описание на русском*
+
+## Требования
+- Node.js и NPM (последняя стабильная версия)
+- NVM (для управления версий Node)
+- Приложение бота в панели разработчика Discord
+
+## Установка и запуск (short)
+1. Установите Node.js (я рекомендую прочитать соответствующее руководство по установке в вашей ОС)
+2. Загрузите исходный код
+3. В каталоге, где находится файл `package.json`, запустите команду `npm install`, чтобы загрузить необходимые модули
+4. Настройте бота, отредактировав файл `src/config.json` в любом текстовом редакторе или терминале (unix – используя `nano src/config.json`). *Смотри ниже*
+5. Запустите бота с помощью команды `node src/index.js` или в фоновом режиме с помощью `node src/index.js &`
+
+
+## Отличия от оригинала
+- Установлена ​​последняя версия модулей (на момент появления этого сообщения)
+- График "исправлен" и настроен под мои нужды
+- Графики загружаются напрямую из исходного файла бота, а не через веб-сервер (так как я не увлекаюсь js)
+- Дополнительные поля настройки в конфиге
+- Удален нежелательный код
+- Удален веб-сервер за ненадобностью
+- Кнопка «Обновить» (после нажатия она остается неактивной в течение первых 10 секунд)
+- Формат списка игроков изменен на более компактный (особенно для просмотра на мобильных устройствах)
+- Исправлена ​​проблема с часовым поясом, теперь он более гибкий для настройки.
+- В списке игроков отображается каждый игрок (максимум 25*30 = 750)
+- Кнопка для показания списка игроков и конфиг
