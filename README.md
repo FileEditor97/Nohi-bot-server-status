@@ -20,6 +20,9 @@ This bot is for self-hosting and may/will not work for huge amount of data. Sour
 ## WIKI
 https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 
+### Example
+[<img alt="example of bot message" src="https://i.imgur.com/e3PKXen.png">](https://i.imgur.com/e3PKXen.png)
+
 
 # *English description*
 
