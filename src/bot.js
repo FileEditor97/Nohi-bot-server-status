@@ -228,7 +228,7 @@ client.on('interactionCreate', interaction => {
 			host: config["server_host"],
 			port: config["server_port"],
 
-			maxAttempts: 3,
+			maxAttempts: 1,
 			socketTimeout: 1000,
 			debug: false
 		}).then((state) => {
@@ -241,7 +241,7 @@ client.on('interactionCreate', interaction => {
 
 			interaction.reply({ embeds: [embed], ephemeral: true });
 		}).catch(function(error) {
-			interaction.reply({ content: "Could not get playerlist. Report to bot's owner!", ephemeral: true });
+			interaction.reply({ content: "Не смог получить список игроков. Возможно, сервер оффлайн.", ephemeral: true });
 		});
 	}
 

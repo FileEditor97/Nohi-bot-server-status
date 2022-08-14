@@ -47,7 +47,7 @@ for (let i = 0; i < config["instances"].length; i++) {
 	let instance = ChildProcess.fork(__dirname + '/bot.js');
 	
 	instance.on('message', function(m) {
-		console.log('[' + Date.now() + '][inst ' + m.instanceid + ']:', m.message);
+		console.log('[' + Date().toLocaleString() + '][inst ' + m.instanceid + ']:', m.message);
 	});
 	
 	// communicate id to instance
