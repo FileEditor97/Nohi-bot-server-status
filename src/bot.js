@@ -2,7 +2,8 @@
 	Author: Ramzi Sah#2992
 	Fork by: FileEditor97
 	Desription:
-		main bot code
+		Main code
+		Retrieves status message or creates new, updates every sycle time or on request
 */
 
 // read configs
@@ -38,10 +39,8 @@ function init() {
 	client.login(config["discordBotToken"]);
 };
 
-
 //----------------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------------
-// common
+// timers
 const { setTimeout } = require('timers/promises');
 function Sleep(ms) {
 	return setTimeout(ms);
@@ -66,7 +65,7 @@ const client = new Client({
 });
 
 //----------------------------------------------------------------------------------------------------------
-// on client ready
+// once client is ready
 client.on('ready', async () => {
 	process.send({
 		instanceid : instanceId,
@@ -82,10 +81,7 @@ client.on('ready', async () => {
 	let statusChannel = client.channels.cache.get(config["serverStatusChannelID"]);
 	
 	if (statusChannel == undefined) {
-		process.send({
-			instanceid : instanceId,
-			message : "ERROR: Channel id \"" + config["serverStatusChannelID"] + "\" does not exist."
-		});
+		console.error('['+instanceId+'] ERROR: Channel id \"" + config["serverStatusChannelID"] + "\" does not exist.');
 		return;
 	};
 	
@@ -93,10 +89,7 @@ client.on('ready', async () => {
 	let statusMessage = await getStatusMessage(statusChannel);
 	
 	if (statusMessage == undefined) {
-		process.send({
-			instanceid : instanceId,
-			message : "ERROR: Could not send the status message."
-		});
+		console.error('['+instanceId+'] ERROR at retrieving status message');
 		return;
 	};
 
@@ -142,7 +135,7 @@ function getLastMessage(statusChannel) {
 		
 		// return first message
 		return messages.first();
-	}).catch(function(error) {
+	}).catch(function() {
 		return;
 	});
 };
@@ -206,6 +199,7 @@ async function startStatusMessage(statusMessage) {
 	};
 };
 
+// buttons pressed on status message
 client.on('interactionCreate', interaction => {
 	if (!interaction.isButton()) return;
 
@@ -246,8 +240,6 @@ client.on('interactionCreate', interaction => {
 	}
 
 });
-
-
 
 //----------------------------------------------------------------------------------------------------------
 // fetch data
@@ -461,11 +453,7 @@ function graphDataPush(time, nbrPlayers) {
 		try {
 			json = JSON.parse(data);
 		} catch (err) {
-			console.error('['+instanceId+'] ERROR at reading JSON data: ', error);
-			process.send({
-				instanceid : instanceId,
-				message : "ERROR: Could not parse/read JSON data."
-			});
+			console.error('['+instanceId+'] ERROR at reading JSON data: ', err);
 			json = JSON.parse("[]");
 		};
 		
@@ -482,6 +470,8 @@ function graphDataPush(time, nbrPlayers) {
 	});
 };
 
+//----------------------------------------------------------------------------------------------------------
+// create graph
 const width = 600;
 const height = 400;
 require('chartjs-adapter-date-fns');
@@ -615,18 +605,10 @@ async function generateGraph() {
 				fs.writeFileSync(__dirname + '/temp/graphs/' + graphFile, data);
 			}).catch(function(error) {
 				console.error('['+instanceId+'] ERROR at rendering graph: ', error);
-				process.send({
-					instanceid : instanceId,
-					message : "ERROR: Graph rendering failed."
-				});
 			});
 
 		} catch (error) {
 			console.error('['+instanceId+'] ERROR at generating graph image: ', error);
-			process.send({
-				instanceid : instanceId,
-				message : "ERROR: Could not generate graph image."
-			});
 		};
 
 		await Sleep(60 * 1000); // every minute
