@@ -62,7 +62,6 @@ async function SleepCanceable(ms) {
 require('dotenv').config();
 const {Client, MessageEmbed, MessageAttachment, Intents, MessageActionRow, MessageButton} = require('discord.js');
 const client = new Client({
-	messageEditHistoryMaxSize: 0,
 	intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES]
 });
 
@@ -193,8 +192,8 @@ async function startStatusMessage(statusMessage) {
 				files: (config["server_enable_graph"] && embed.image != null) ? [new MessageAttachment(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
 			}).then(() => setTimeout(10000).finally(() => {
 				row.components[0].setDisabled(false);
-				statusMessage.edit({ components: [row] });
-			}));
+				statusMessage.edit({ components: [row] }).catch(console.error);
+			})).catch(console.error);
 		} catch (error) {
 			console.error('['+instanceId+'] ERROR at editing status message: ', error);
 			process.send({
@@ -230,6 +229,7 @@ client.on('interactionCreate', interaction => {
 
 			maxAttempts: 1,
 			socketTimeout: 1000,
+			givenPortOnly: true,
 			debug: false
 		}).then((state) => {
 			let embed = new MessageEmbed();
@@ -278,7 +278,8 @@ function generateStatusEmbed() {
 		port: config["server_port"],
 
 		maxAttempts: 5,
-		socketTimeout: 1000,
+		socketTimeout: 2000,
+		givenPortOnly: true,
 		debug: false
 	}).then((state) => {
 		// set embed color
@@ -339,10 +340,6 @@ function generateStatusEmbed() {
 		return embed
 	}).catch(function(error) {
 		console.error('['+instanceId+'] ERROR at quering the server: ', error);
-		process.send({
-			instanceid : instanceId,
-			message : "ERROR: Failed at querying the server."
-		});
 			
 		// set bot activity
 		client.user.setActivity("❌ Оффлайн.", { type: 'WATCHING' });
