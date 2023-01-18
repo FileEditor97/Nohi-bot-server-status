@@ -59,9 +59,9 @@ async function SleepCanceable(ms) {
 //----------------------------------------------------------------------------------------------------------
 // create client
 require('dotenv').config();
-const {Client, MessageEmbed, MessageAttachment, Intents, MessageActionRow, MessageButton} = require('discord.js');
+const {Client, EmbedBuilder, AttachmentBuilder, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle} = require('discord.js');
 const client = new Client({
-	intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES]
+	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
 
 //----------------------------------------------------------------------------------------------------------
@@ -119,7 +119,7 @@ async function getStatusMessage(statusChannel) {
 	};
 
 	// OR create new message
-	let embed = new MessageEmbed();
+	let embed = new EmbedBuilder();
 	embed.setTitle("Запускаю панель...");
 	embed.setColor('#ffff00');
 	
@@ -153,46 +153,42 @@ async function startStatusMessage(statusMessage) {
 		});
 		try {
 			// steam link and refresh button button
-			let row = new MessageActionRow()
+			let row = new ActionRowBuilder()
 				.addComponents(
-					new MessageButton()
+					new ButtonBuilder()
 						.setCustomId('refresh')
 						.setEmoji('🔄')
 						.setLabel('Обновить')
-						.setStyle('SECONDARY')
+						.setStyle(ButtonStyle.Secondary)
 						.setDisabled()
 				);
 			if (config['steam_connect_button']) {
 				row.addComponents(
-					new MessageButton()
+					new ButtonBuilder()
 						.setCustomId('steamLink')
 						.setLabel('Присоединиться')
-						.setStyle('PRIMARY')
+						.setStyle(ButtonStyle.Primary)
 				);
 			}
 			if (config["server_playerlist"] == "1") {
 				row.addComponents(
-					new MessageButton()
+					new ButtonBuilder()
 						.setCustomId('playerlist')
 						.setEmoji('📊')
 						.setLabel('Показать список игроков')
-						.setStyle('SUCCESS')
-				)
+						.setStyle(ButtonStyle.Success)
+				);
 			}
 		
 			let embed = await generateStatusEmbed();
 			statusMessage.edit({ embeds: [embed], components: [row],
-				files: (config["server_enable_graph"] && embed.image != null) ? [new MessageAttachment(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
+				files: (config["server_enable_graph"]) ? [new AttachmentBuilder(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
 			}).then(() => setTimeout(10000).finally(() => {
 				row.components[0].setDisabled(false);
 				statusMessage.edit({ components: [row] }).catch(console.error);
 			})).catch(console.error);
 		} catch (error) {
 			console.error('['+instanceId+'] ERROR at editing status message: ', error);
-			process.send({
-				instanceid : instanceId,
-				message : "ERROR: Could not edit status message."
-			});
 		};
 
 		await SleepCanceable(config["statusUpdateTime"] * 1000);
@@ -226,7 +222,7 @@ client.on('interactionCreate', interaction => {
 			givenPortOnly: true,
 			debug: false
 		}).then((state) => {
-			let embed = new MessageEmbed();
+			let embed = new EmbedBuilder();
 
 			embed.setTitle('Список игроков ('+state.players.length + "/" + state.maxplayers+'):');
 			embed.setColor(config["server_color"]);
@@ -246,7 +242,7 @@ client.on('interactionCreate', interaction => {
 const gamedig = require('gamedig');
 var tic = false;
 function generateStatusEmbed() {
-	let embed = new MessageEmbed();
+	let embed = new EmbedBuilder();
 
 	// set embed name and logo
 	embed.setAuthor({ name: config["server_title"], iconURL: config["server_logo"], url: config["server_url"]});
@@ -255,13 +251,13 @@ function generateStatusEmbed() {
 	tic = !tic;
 	let ticEmojy = tic ? "⚪" : "⚫";
 	
-	let time = new Date();
+	let currentTime = new Date();
 
-	embed.setTimestamp(time);
+	embed.setTimestamp(currentTime);
 
-	let serverTime = time.toLocaleString('ru', {timeZone: config['timezone']});
+	let serverTimeString = currentTime.toLocaleString('ru', {timeZone: config['timezone']});
 
-	embed.setFooter({ text: 'Время сервера : ' + serverTime + '\n' + ticEmojy + ' ' + "Последнее обновление" });
+	embed.setFooter({ text: 'Время сервера : ' + serverTimeString + '\n' + ticEmojy + ' ' + "Последнее обновление" });
 	
 	// query gamedig
 	return gamedig.query({
@@ -294,22 +290,26 @@ function generateStatusEmbed() {
 		};
 			
 		// server name field
-		embed.addField("Название сервера" + ' :', serverName);
+		embed.addFields({ name: "Название сервера" + ' :', value: serverName});
 
 		// basic server info
 		if (!config["minimal"]) {
-			embed.addField("Прямое подключение" + ' :', "`" + state.connect + "`", true);
-			embed.addField("Режим игры" + ' :', (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), true);
+			embed.addFields(
+				{ name: "Прямое подключение" + ' :', value: "`" + state.connect + "`", inline: true },
+				{ name: "Режим игры" + ' :', value: (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), inline: true },
+			);
 			if (state.map == "") {
-				embed.addField("\u200B", "\u200B", true);
+				embed.addFields({ name: "\u200B", value: "\u200B", inline: true });
 			} else {
-				embed.addField("Карта" + ' :', state.map, true);
+				embed.addFields({ name: "Карта" + ' :', value: state.map, inline: true });
 			};
 		};
 
-		embed.addField("Статус" + ' :', "✅ " + "Онлайн", true);
-		embed.addField("Кол-во игроков" + ' :', state.players.length + "/" + state.maxplayers, true);
-		embed.addField('\u200B', '\u200B', true);
+		embed.addFields(
+			{ name: "Статус" + ' :', value: "✅ " + "Онлайн", inline: true },
+			{ name: "Кол-во игроков" + ' :', value: state.players.length + "/" + state.maxplayers, inline: true },
+			{ name: '\u200B', value: '\u200B', inline: true }
+		);
 			
 		// player list
 		if (config["server_playerlist"] == "2" && state.players.length > 0) {
@@ -320,7 +320,7 @@ function generateStatusEmbed() {
 		client.user.setActivity("✅ Онлайн: " + state.players.length + "/" + state.maxplayers, { type: 'WATCHING' });
 
 		// add graph data
-		graphDataPush(time, state.players.length);
+		graphDataPush(currentTime, state.players.length);
 
 		// set graph image
 		if (config["server_enable_graph"]) {
@@ -341,13 +341,13 @@ function generateStatusEmbed() {
 		embed.setTitle('❌ ' + "Сервен оффлайн" + '.');
 
 		// add graph data
-		graphDataPush(time, 0);
+		graphDataPush(currentTime, 0);
 
 		return embed
 	});
 };
 
-function getPlayerlist(state, embed, inline) {
+function getPlayerlist(state, embed, isInline) {
 	// recover game data
 	let dataKeys = Object.keys(state.players[0]);
 			
@@ -431,9 +431,9 @@ function getPlayerlist(state, embed, inline) {
 	fields[j] += "```";
 
 	// add fields to embed
-	embed.addField(field_label + ' :', fields[0], inline);
+	embed.addFields({ name: field_label + ' :', value: fields[0], inline: isInline });
 	for (let i = 1; i < fields.length; i++) {
-		embed.addField('\u200B', fields[i], inline);
+		embed.addFields({ name: '\u200B', value: fields[i], inline: isInline});
 	};
 
 	return embed;
@@ -474,8 +474,9 @@ function graphDataPush(time, nbrPlayers) {
 // create graph
 const width = 600;
 const height = 400;
-require('chartjs-adapter-date-fns');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
+require('chartjs-adapter-date-fns');
+const { utcToZonedTime }  = require('date-fns-tz');
 var canvasRenderService = new ChartJSNodeCanvas({width, height});
 var timeFormat = {
 	'millisecond': 'HH:mm',
@@ -506,7 +507,7 @@ async function generateGraph() {
 				
 			// set data
 			for (let i = 0; i < data.length; i += 1) {
-				graph_labels.push(new Date(data[i]["x"]));
+				graph_labels.push(utcToZonedTime(data[i]["x"], config['timezone']));
 				graph_datas.push(data[i]["y"]);
 			};
 

@@ -1,6 +1,6 @@
 {
   "name": "game-server-status",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "discord bot",
   "repository": "github:FileEditor97/Nohi-bot-server-status",
   "main": "index.js",
@@ -13,12 +13,13 @@
   ],
   "license": "GNU GPLv3",
   "dependencies": {
-    "chartjs-adapter-date-fns": "^2.0.0",
+    "date-fns": "2.29.3",
+    "date-fns-tz": "1.3.7",
+    "chartjs-adapter-date-fns": "2.0.0",
     "chartjs-node-canvas": "^4.1.6",
-    "date-fns": "^2.21.1",
-    "discord.js": "^13.6.0",
-    "dotenv": "^10.0.0",
-    "gamedig": "^4.0.5"
+    "discord.js": "^14.7.1",
+    "dotenv": "16.0.3",
+    "gamedig": "^4.0.6"
   },
   "engines": {
     "node": ">= 16.9.0",
