@@ -78,10 +78,10 @@ client.on('ready', async () => {
 	};
 	
 	// get broadcast channel
-	let statusChannel = client.channels.cache.get(config["serverStatusChannelID"]);
+	let statusChannel = client.channels.cache.get(config["serverStatusChannelId"]);
 	
 	if (statusChannel == undefined) {
-		console.error('['+instanceId+'] ERROR: Channel id \"" + config["serverStatusChannelID"] + "\" does not exist.');
+		console.error('['+instanceId+'] ERROR: Channel id \"" + config["serverStatusChannelId"] + "\" does not exist.');
 		return;
 	};
 	
