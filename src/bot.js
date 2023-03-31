@@ -186,9 +186,11 @@ async function startStatusMessage(statusMessage) {
 			}
 
 			let embed = await generateStatusEmbed();
+			let file = config["server_enable_graph"] && fs.existsSync(__dirname + "/temp/graphs/graph_" + instanceId + ".png") ? 
+				[new AttachmentBuilder(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : [];
 			statusMessage.edit({
 				embeds: [embed], components: [row],
-				files: (config["server_enable_graph"]) ? [new AttachmentBuilder(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
+				files: file
 			}).then(() => setTimeout(20000).finally(() => {
 				row.components[0].setDisabled(false);
 				statusMessage.edit({ components: [row] });
@@ -266,16 +268,15 @@ function generateStatusEmbed() {
 	embed.setFooter({ text: 'Время сервера : ' + serverTimeString + '\n' + ticEmojy + ' ' + "Последнее обновление" });
 
 	// query gamedig
-	try {
-		const state = gamedig.query({
-			type: config["server_type"],
-			host: config["server_host"],
-			port: config["server_port"],
+	return gamedig.query({
+		type: config["server_type"],
+		host: config["server_host"],
+		port: config["server_port"],
 
-			maxAttempts: 5,
-			socketTimeout: 2000,
-			givenPortOnly: true,
-		});
+		maxAttempts: 5,
+		socketTimeout: 2000,
+		givenPortOnly: true,
+	}).then((state) => {
 		// set embed color
 		embed.setColor(config["server_color"]);
 
@@ -283,7 +284,7 @@ function generateStatusEmbed() {
 		let serverName = config["server_name"];
 		// OR get servername from gamedig
 		//let serverName = state.name;
-		
+
 		// refactor server name
 		for (let i = 0; i < serverName.length; i++) {
 			if (serverName[i] == "^") {
@@ -302,7 +303,8 @@ function generateStatusEmbed() {
 		if (!config["minimal"]) {
 			embed.addFields(
 				{ name: "Прямое подключение" + ' :', value: "`" + state.connect + "`", inline: true },
-				{ name: "Режим игры" + ' :', value: (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), inline: true });
+				{ name: "Режим игры" + ' :', value: (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), inline: true }
+			);
 			if (state.map == "") {
 				embed.addFields({ name: "\u200B", value: "\u200B", inline: true });
 			} else {
@@ -333,8 +335,9 @@ function generateStatusEmbed() {
 				"attachment://graph_" + instanceId + ".png"
 			);
 		};
+		
 		return embed;
-	} catch (error) {
+	}).catch((error) => {
 		sendError("Couldn't query the server", error);
 
 		// set bot activity
@@ -354,7 +357,7 @@ function generateStatusEmbed() {
 			);
 		};
 		return embed;
-	}
+	});
 };
 
 function getPlayerlist(state, embed, isInline) {

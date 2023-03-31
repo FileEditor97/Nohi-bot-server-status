@@ -4,6 +4,7 @@
   "description": "discord bot",
   "repository": "github:FileEditor97/Nohi-bot-server-status",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
