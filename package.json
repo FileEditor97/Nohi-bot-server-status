@@ -14,7 +14,7 @@
   ],
   "license": "GNU GPLv3",
   "dependencies": {
-    "chartjs-adapter-date-fns": "3.0.0",
+    "chartjs-adapter-date-fns": "2.0.1",
     "chartjs-node-canvas": "^4.1.6",
     "date-fns": "^2.29.3",
     "date-fns-tz": "2.0.0",
