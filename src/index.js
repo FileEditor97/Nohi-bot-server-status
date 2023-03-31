@@ -25,6 +25,13 @@ if (!fs.existsSync(__dirname + "/temp/data")){
     fs.mkdirSync(__dirname + "/temp/data");
 };
 
+//---------------------------------------------------------------------------------------------------
+function getTime() {
+	return new Date().toISOString().
+  		replace(/T/, ' ').      // replace T with a space
+  		replace(/\..+/, '')     // delete the dot and everything after
+}
+
 // resolve discord.com
 require('dns').resolve('www.discord.com', function(err) {
 	if (err) {
@@ -39,15 +46,16 @@ require('dns').resolve('www.discord.com', function(err) {
 const ChildProcess = require('child_process');
 var instances = [];
 
-//---------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------
 // start instances
 for (let i = 0; i < config["instances"].length; i++) {
 	// create child process for every instance
 	let instance = ChildProcess.fork(__dirname + '/bot.js');
 	
-	instance.on('message', function(m) {
-		console.log('[' + Date().toLocaleString() + '][inst ' + m.instanceid + ']:', m.message);
+	instance.on('message', (m) => {
+		if (m.error) {
+			console.error(`[${getTime()}][${m.id}]: ${m.message}\n${m.error}`);
+		}
+		console.log(`[${getTime()}][${m.id}]: ${m.message}`);
 	});
 	
 	// communicate id to instance

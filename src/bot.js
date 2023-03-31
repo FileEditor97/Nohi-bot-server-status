@@ -13,21 +13,33 @@ var config = JSON.parse(fs.readFileSync(__dirname + '/config.json', 'utf8'));
 // await for instance id
 var instanceId = -1;
 
-process.on('message', function(m) {
+async function sendMsg(text) {
+	process.send({
+		id: instanceId,
+		message: text,
+		err: undefined
+	});
+}
+async function sendError(text, error) {
+	process.send({
+		id: instanceId,
+		message: text,
+		err: error
+	});
+}
+
+process.on('message', (m) => {
 	// get message type
 	if (Object.keys(m)[0] == "id") {
 		// set instance id
-		instanceId = m.id
-		
+		instanceId = m.id;
+
 		// send ok signal to main process
-		process.send({
-			instanceid : instanceId,
-			message : "Instance started."
-		});
-		
+		sendMsg("ID received by instance.");
+
 		// init bot
 		init();
-	};
+	}
 });
 
 function init() {
@@ -64,47 +76,39 @@ const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
 
-//----------------------------------------------------------------------------------------------------------
 // once client is ready
 client.on('ready', async () => {
-	process.send({
-		instanceid : instanceId,
-		message : "Logged in as \"" + client.user.tag + "\"."
-	});
-	
-	// wait until process instance id receaived
+	sendMsg("Logged in as \"" + client.user.tag + "\".");
+
+	// wait until process instance id received
 	while (instanceId < 0) {
 		await Sleep(1000);
 	};
-	
-	// get broadcast channel
+
+	// get channel
 	let statusChannel = client.channels.cache.get(config["serverStatusChannelId"]);
-	
 	if (statusChannel == undefined) {
-		console.error('['+instanceId+'] ERROR: Channel id \"" + config["serverStatusChannelId"] + "\" does not exist.');
+		sendError("Channel by ID '" + config["serverStatusChannelId"] + "' not found.");
 		return;
 	};
-	
+
 	// get a status message
 	let statusMessage = await getStatusMessage(statusChannel);
-	
 	if (statusMessage == undefined) {
-		console.error('['+instanceId+'] ERROR at retrieving status message');
+		sendError("Couldn't retrieve or create status message.");
 		return;
 	};
 
 	// start server status loop
 	startStatusMessage(statusMessage);
-	
+
 	// start generate graph loop
 	generateGraph(); // needs it's own loop, as graph is generated only once every minute
 });
 
+// if reconnecting
 client.once('reconnecting', c => {
-	process.send({
-		instanceid : instanceId,
-		message : "🔃 Reconnecting..."
-	});
+	sendMsg("Reconnecting...")
 });
 
 
@@ -122,20 +126,20 @@ async function getStatusMessage(statusChannel) {
 	let embed = new EmbedBuilder();
 	embed.setTitle("Запускаю панель...");
 	embed.setColor('#ffff00');
-	
+
 	return await statusChannel.send({ embeds: [embed] }).then((sentMessage) => {
 		return sentMessage;
-	});	
+	});
 };
 
 function getLastMessage(statusChannel) {
-	return statusChannel.messages.fetch({limit: 20}).then(messages => {
+	return statusChannel.messages.fetch({ limit: 20 }).then(messages => {
 		// select bot messages
 		messages = messages.filter(msg => (msg.author.id == client.user.id && !msg.system));
-		
+
 		// return first message
 		return messages.first();
-	}).catch(function() {
+	}).catch(function () {
 		return;
 	});
 };
@@ -143,11 +147,12 @@ function getLastMessage(statusChannel) {
 
 //----------------------------------------------------------------------------------------------------------
 // main loops
+const dns = require('dns');
 async function startStatusMessage(statusMessage) {
-	while(client.token != null){ // client.token is not null if it's alive (logged in)
-		require('dns').resolve('www.discord.com', function(err) {
+	while (true) {
+		dns.resolve('www.discord.com', err => {
 			if (err) {
-				console.log("Lost connection to Discord");
+				sendError("Lost connection to Discord.");
 				process.exit(1);
 			}
 		});
@@ -179,16 +184,17 @@ async function startStatusMessage(statusMessage) {
 						.setStyle(ButtonStyle.Success)
 				);
 			}
-		
+
 			let embed = await generateStatusEmbed();
-			statusMessage.edit({ embeds: [embed], components: [row],
+			statusMessage.edit({
+				embeds: [embed], components: [row],
 				files: (config["server_enable_graph"]) ? [new AttachmentBuilder(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : []
-			}).then(() => setTimeout(10000).finally(() => {
+			}).then(() => setTimeout(20000).finally(() => {
 				row.components[0].setDisabled(false);
-				statusMessage.edit({ components: [row] }).catch(console.error);
-			})).catch(console.error);
+				statusMessage.edit({ components: [row] });
+			}));
 		} catch (error) {
-			console.error('['+instanceId+'] ERROR at editing status message: ', error);
+			sendError("Couldn't edit embed message.", error);
 		};
 
 		await SleepCanceable(config["statusUpdateTime"] * 1000);
@@ -230,7 +236,7 @@ client.on('interactionCreate', interaction => {
 			embed = getPlayerlist(state, embed, true);
 
 			interaction.reply({ embeds: [embed], ephemeral: true });
-		}).catch(function(error) {
+		}).catch(() => {
 			interaction.reply({ content: "Не смог получить список игроков. Возможно, сервер оффлайн.", ephemeral: true });
 		});
 	}
@@ -245,31 +251,31 @@ function generateStatusEmbed() {
 	let embed = new EmbedBuilder();
 
 	// set embed name and logo
-	embed.setAuthor({ name: config["server_title"], iconURL: config["server_logo"], url: config["server_url"]});
-	
+	embed.setAuthor({ name: config["server_title"], iconURL: config["server_logo"], url: config["server_url"] });
+
 	// set embed updated time
 	tic = !tic;
 	let ticEmojy = tic ? "⚪" : "⚫";
-	
+
 	let currentTime = new Date();
 
 	embed.setTimestamp(currentTime);
 
-	let serverTimeString = currentTime.toLocaleString('ru', {timeZone: config['timezone']});
+	let serverTimeString = currentTime.toLocaleString('ru', { timeZone: config['timezone'] });
 
 	embed.setFooter({ text: 'Время сервера : ' + serverTimeString + '\n' + ticEmojy + ' ' + "Последнее обновление" });
-	
-	// query gamedig
-	return gamedig.query({
-		type: config["server_type"],
-		host: config["server_host"],
-		port: config["server_port"],
 
-		maxAttempts: 5,
-		socketTimeout: 2000,
-		givenPortOnly: true,
-		debug: false
-	}).then((state) => {
+	// query gamedig
+	try {
+		const state = gamedig.query({
+			type: config["server_type"],
+			host: config["server_host"],
+			port: config["server_port"],
+
+			maxAttempts: 5,
+			socketTimeout: 2000,
+			givenPortOnly: true,
+		});
 		// set embed color
 		embed.setColor(config["server_color"]);
 
@@ -277,27 +283,26 @@ function generateStatusEmbed() {
 		let serverName = config["server_name"];
 		// OR get servername from gamedig
 		//let serverName = state.name;
-			
+		
 		// refactor server name
 		for (let i = 0; i < serverName.length; i++) {
 			if (serverName[i] == "^") {
-				serverName = serverName.slice(0, i) + " " + serverName.slice(i+2);
+				serverName = serverName.slice(0, i) + " " + serverName.slice(i + 2);
 			} else if (serverName[i] == "█") {
-				serverName = serverName.slice(0, i) + " " + serverName.slice(i+1);
+				serverName = serverName.slice(0, i) + " " + serverName.slice(i + 1);
 			} else if (serverName[i] == "�") {
-				serverName = serverName.slice(0, i) + " " + serverName.slice(i+2);
+				serverName = serverName.slice(0, i) + " " + serverName.slice(i + 2);
 			};
 		};
-			
+
 		// server name field
-		embed.addFields({ name: "Название сервера" + ' :', value: serverName});
+		embed.addFields({ name: "Название сервера" + ' :', value: serverName });
 
 		// basic server info
 		if (!config["minimal"]) {
 			embed.addFields(
 				{ name: "Прямое подключение" + ' :', value: "`" + state.connect + "`", inline: true },
-				{ name: "Режим игры" + ' :', value: (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), inline: true },
-			);
+				{ name: "Режим игры" + ' :', value: (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), inline: true });
 			if (state.map == "") {
 				embed.addFields({ name: "\u200B", value: "\u200B", inline: true });
 			} else {
@@ -310,12 +315,12 @@ function generateStatusEmbed() {
 			{ name: "Кол-во игроков" + ' :', value: state.players.length + "/" + state.maxplayers, inline: true },
 			{ name: '\u200B', value: '\u200B', inline: true }
 		);
-			
+
 		// player list
 		if (config["server_playerlist"] == "2" && state.players.length > 0) {
 			embed = getPlayerlist(state, embed, false);
 		};
-			
+
 		// set bot activity
 		client.user.setActivity("✅ Онлайн: " + state.players.length + "/" + state.maxplayers, { type: 'WATCHING' });
 
@@ -328,14 +333,13 @@ function generateStatusEmbed() {
 				"attachment://graph_" + instanceId + ".png"
 			);
 		};
+		return embed;
+	} catch (error) {
+		sendError("Couldn't query the server", error);
 
-		return embed
-	}).catch(function(error) {
-		console.error('['+instanceId+'] ERROR at quering the server: ', error);
-			
 		// set bot activity
 		client.user.setActivity("❌ Оффлайн.", { type: 'WATCHING' });
-	
+
 		// offline status message
 		embed.setColor('#ff0000');
 		embed.setTitle('❌ ' + "Сервен оффлайн" + '.');
@@ -343,32 +347,38 @@ function generateStatusEmbed() {
 		// add graph data
 		graphDataPush(currentTime, 0);
 
-		return embed
-	});
+		// set graph image
+		if (config["server_enable_graph"]) {
+			embed.setImage(
+				"attachment://graph_" + instanceId + ".png"
+			);
+		};
+		return embed;
+	}
 };
 
 function getPlayerlist(state, embed, isInline) {
 	// recover game data
 	let dataKeys = Object.keys(state.players[0]);
-			
+
 	// set name as first
 	if (dataKeys.includes('name')) {
 		dataKeys = dataKeys.filter(e => e !== 'name');
 		dataKeys.splice(0, 0, 'name');
 	};
-	
+
 	// remove some unwanted data
-	dataKeys = dataKeys.filter(e => 
-		e !== 'frags' && 
-		e !== 'score' && 
-		e !== 'guid' && 
-		e !== 'id' && 
+	dataKeys = dataKeys.filter(e =>
+		e !== 'frags' &&
+		e !== 'score' &&
+		e !== 'guid' &&
+		e !== 'id' &&
 		e !== 'team' &&
 		e !== 'squad' &&
 		// e !== 'raw' && // need to parse raw data -> time and score
 		e !== 'skin'
 	);
-		
+
 	// declare field label
 	let field_label = "Время и Ник";
 
@@ -401,7 +411,7 @@ function getPlayerlist(state, embed, isInline) {
 				player_data = 0;
 			};
 			// process time
-			let date = new Date(player_data * 1000).toISOString().substring(11,19).split(":");
+			let date = new Date(player_data * 1000).toISOString().substring(11, 19).split(":");
 			date = date[0] + ":" + date[1];
 			fields[j] += date;
 
@@ -415,7 +425,7 @@ function getPlayerlist(state, embed, isInline) {
 			// process name
 			for (let k = 0; k < player_data.length; k++) {
 				if (player_data[k] == "^") {
-					player_data = player_data.slice(0, k) + " " + player_data.slice(k+2);
+					player_data = player_data.slice(0, k) + " " + player_data.slice(k + 2);
 				};
 			};
 			// handle very long strings
@@ -433,7 +443,7 @@ function getPlayerlist(state, embed, isInline) {
 	// add fields to embed
 	embed.addFields({ name: field_label + ' :', value: fields[0], inline: isInline });
 	for (let i = 1; i < fields.length; i++) {
-		embed.addFields({ name: '\u200B', value: fields[i], inline: isInline});
+		embed.addFields({ name: '\u200B', value: fields[i], inline: isInline });
 	};
 
 	return embed;
@@ -441,32 +451,32 @@ function getPlayerlist(state, embed, isInline) {
 
 function graphDataPush(time, nbrPlayers) {
 	// save data to json file
-	fs.readFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', function (err, data) {
+	fs.readFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', (err, data) => {
 		// create file if does not exist
 		if (err) {
-			fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify([]),function(err){if (err) throw err;});
+			fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify([]), (error) => {if (error) throw error});
 			return;
 		};
-		
+
 		let json;
 		// read old data and concat new data
 		try {
 			json = JSON.parse(data);
-		} catch (err) {
-			console.error('['+instanceId+'] ERROR at reading JSON data: ', err);
+		} catch (error) {
+			sendError("Couldn't read JSON file.", error);
 			json = JSON.parse("[]");
 		};
-		
+
 		// 1 day history
 		let nbrMuchData = json.length - 24 * 60 * 60 / config["statusUpdateTime"];
 		if (nbrMuchData > 0) {
 			json.splice(0, nbrMuchData);
 		};
-		
-		json.push({"x": time, "y": nbrPlayers});
-		
+
+		json.push({ "x": time, "y": nbrPlayers });
+
 		// rewrite data file 
-		fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify(json), function(err){});
+		fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify(json), () => {});
 	});
 };
 
@@ -476,8 +486,8 @@ const width = 600;
 const height = 400;
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 require('chartjs-adapter-date-fns');
-const { utcToZonedTime }  = require('date-fns-tz');
-var canvasRenderService = new ChartJSNodeCanvas({width, height});
+const { utcToZonedTime } = require('date-fns-tz');
+var canvasRenderService = new ChartJSNodeCanvas({ width, height });
 var timeFormat = {
 	'millisecond': 'HH:mm',
 	'second': 'HH:mm',
@@ -490,38 +500,38 @@ var timeFormat = {
 	'year': 'HH:mm',
 };
 async function generateGraph() {
-	while(client.token != null){ // client.token is not null if it's alive (logged in)
+	while (client.token != null) { // client.token is not null if it's alive (logged in)
 		try {
 
 			// generate graph
 			let data = [];
 
 			try {
-				data = JSON.parse(fs.readFileSync(__dirname + '/temp/data/serverData_' + instanceId + '.json', {encoding:'utf8', flag:'r'}));
+				data = JSON.parse(fs.readFileSync(__dirname + '/temp/data/serverData_' + instanceId + '.json', { encoding: 'utf8', flag: 'r' }));
 			} catch (error) {
 				data = [];
 			}
 
 			let graph_labels = [];
 			let graph_datas = [];
-				
+
 			// set data
 			for (let i = 0; i < data.length; i += 1) {
 				graph_labels.push(utcToZonedTime(data[i]["x"], config['timezone']));
 				graph_datas.push(data[i]["y"]);
 			};
 
-			let graphConfig =  {
+			let graphConfig = {
 				type: 'line',
-					
+
 				data: {
 					labels: graph_labels,
 					datasets: [{
 						label: 'кол-во игроков',
 						data: graph_datas,
-						
+
 						pointRadius: 0,
-						
+
 						backgroundColor: hexToRgb(config["server_color"], 0.2),
 						borderColor: hexToRgb(config["server_color"], 1.0),
 
@@ -529,7 +539,7 @@ async function generateGraph() {
 						spanGaps: true // enable for a single dataset
 					}]
 				},
-				
+
 				options: {
 					plugins: {
 						decimation: {
@@ -544,7 +554,7 @@ async function generateGraph() {
 							}
 						},
 					},
-					
+
 					scales: {
 						yAxes: {
 							display: true,
@@ -573,7 +583,7 @@ async function generateGraph() {
 								unit: 'hour',
 								stepSize: 1
 							},
-							grid: {							
+							grid: {
 								color: 'rgba(255,255,255,0.2)',
 								lineWidth: 0.5
 							}
@@ -584,7 +594,7 @@ async function generateGraph() {
 					},
 					elements: {
 						point: {
-							radius: 0	
+							radius: 0
 						},
 						line: {
 							borderWidth: 2 // line width
@@ -601,15 +611,15 @@ async function generateGraph() {
 			};
 
 			let graphFile = 'graph_' + instanceId + '.png';
-				
+
 			canvasRenderService.renderToBuffer(graphConfig).then(data => {
 				fs.writeFileSync(__dirname + '/temp/graphs/' + graphFile, data);
-			}).catch(function(error) {
-				console.error('['+instanceId+'] ERROR at rendering graph: ', error);
+			}).catch((error) => {
+				sendError("Couldn't render graph.", error);
 			});
 
 		} catch (error) {
-			console.error('['+instanceId+'] ERROR at generating graph image: ', error);
+			sendError("Couldn't generate graph image.", error);
 		};
 
 		await Sleep(60 * 1000); // every minute
