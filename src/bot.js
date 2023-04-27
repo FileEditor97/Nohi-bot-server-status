@@ -17,14 +17,14 @@ async function sendMsg(text) {
 	process.send({
 		id: instanceId,
 		message: text,
-		err: undefined
+		error: undefined,
 	});
 }
-async function sendError(text, error) {
+async function sendError(text, err) {
 	process.send({
 		id: instanceId,
 		message: text,
-		err: error
+		error: err.stack,
 	});
 }
 
@@ -46,10 +46,17 @@ function init() {
 	// get config
 	config["instances"][instanceId]["statusUpdateTime"] = config["statusUpdateTime"];
 	config = config["instances"][instanceId];
+
+	// set config defaults
+	if (config["timezone"] == "") config["timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone;
 	
 	// connect to discord API
 	client.login(config["discordBotToken"]);
 };
+
+function parse(text) {
+	return (text == "" ? undefined : text)
+}
 
 //----------------------------------------------------------------------------------------------------------
 // timers
@@ -253,7 +260,7 @@ function generateStatusEmbed() {
 	let embed = new EmbedBuilder();
 
 	// set embed name and logo
-	embed.setAuthor({ name: config["server_title"], iconURL: config["server_logo"], url: config["server_url"] });
+	if (config["server_title"] != "") embed.setAuthor({ name: config["server_title"], iconURL: parse(config["server_logo"]), url: parse(config["server_url"]) });
 
 	// set embed updated time
 	tic = !tic;
@@ -282,8 +289,7 @@ function generateStatusEmbed() {
 
 		// set server name
 		let serverName = config["server_name"];
-		// OR get servername from gamedig
-		//let serverName = state.name;
+		if (serverName == "") serverName = state.name;
 
 		// refactor server name
 		for (let i = 0; i < serverName.length; i++) {

@@ -53,9 +53,10 @@ for (let i = 0; i < config["instances"].length; i++) {
 	
 	instance.on('message', (m) => {
 		if (m.error) {
-			console.error(`[${getTime()}][${m.id}]: ${m.message}\n${m.error}`);
+			console.error('[%s][%s]: %s\n%s', getTime(), m.id, m.message, m.error);
+		} else {
+			console.log('[%s][%s]: %s', getTime(), m.id, m.message);
 		}
-		console.log(`[${getTime()}][${m.id}]: ${m.message}`);
 	});
 	
 	// communicate id to instance
