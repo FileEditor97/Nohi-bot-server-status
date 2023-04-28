@@ -24,7 +24,7 @@ async function sendError(text, err) {
 	process.send({
 		id: instanceId,
 		message: text,
-		error: err.stack,
+		error: (err == undefined ? "No message" : err.stack),
 	});
 }
 
@@ -96,14 +96,14 @@ client.on('ready', async () => {
 	let statusChannel = client.channels.cache.get(config["serverStatusChannelId"]);
 	if (statusChannel == undefined) {
 		sendError("Channel by ID '" + config["serverStatusChannelId"] + "' not found.");
-		return;
+		process.exit(1);
 	};
 
 	// get a status message
 	let statusMessage = await getStatusMessage(statusChannel);
 	if (statusMessage == undefined) {
 		sendError("Couldn't retrieve or create status message.");
-		return;
+		process.exit(1);
 	};
 
 	// start server status loop
@@ -476,7 +476,7 @@ function graphDataPush(time, nbrPlayers) {
 			json = JSON.parse("[]");
 		};
 
-		// 1 day history
+		// remove ~24 hour old data
 		let nbrMuchData = json.length - 24 * 60 * 60 / config["statusUpdateTime"];
 		if (nbrMuchData > 0) {
 			json.splice(0, nbrMuchData);
@@ -484,7 +484,7 @@ function graphDataPush(time, nbrPlayers) {
 
 		json.push({ "x": time, "y": nbrPlayers });
 
-		// rewrite data file 
+		// append data file 
 		fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify(json), () => {});
 	});
 };
