@@ -4,11 +4,11 @@
 
 This bot is for self-hosting and may/will not work for huge amount of data. Source code is provided as it is.
 
-**USER INTERFACE IS IN RUSSIAN**  
-**ИНТЕРФЕЙС НА РУССКОМ**
+**USER INTERFACE IS IN ENGLISH**
+**ИНТЕРФЕЙС НА АНГЛИЙСКОМ**
+[See all available languages here / Все доступные языки тут] (https://github.com/FileEditor97/Nohi-bot-server-status/branches)
 
-**NOTE: I'm not into javascript and therefor am not aware of it possibilities and "rules". Some changes may be incorrect, but this variant serves it purpose for me good.**  
-**This repository may be left abandoned after some time as I'm planing on implementing it's features in other language.**
+**NOTE: As i'm still learning js, there may be some errors and bad implimentations. If you hava any suggestions, contact me bellow.**  
 
 ## Credits
 - [Ramzi-Sah](https://github.com/Ramzi-Sah) for creating the original bot
