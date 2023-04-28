@@ -131,7 +131,7 @@ async function getStatusMessage(statusChannel) {
 
 	// OR create new message
 	let embed = new EmbedBuilder();
-	embed.setTitle("Запускаю панель...");
+	embed.setTitle("Starting up the panel...");
 	embed.setColor('#ffff00');
 
 	return await statusChannel.send({ embeds: [embed] }).then((sentMessage) => {
@@ -170,7 +170,7 @@ async function startStatusMessage(statusMessage) {
 					new ButtonBuilder()
 						.setCustomId('refresh')
 						.setEmoji('🔄')
-						.setLabel('Обновить')
+						.setLabel('Refresh')
 						.setStyle(ButtonStyle.Secondary)
 						.setDisabled()
 				);
@@ -178,7 +178,7 @@ async function startStatusMessage(statusMessage) {
 				row.addComponents(
 					new ButtonBuilder()
 						.setCustomId('steamLink')
-						.setLabel('Присоединиться')
+						.setLabel('Connect')
 						.setStyle(ButtonStyle.Primary)
 				);
 			}
@@ -187,7 +187,7 @@ async function startStatusMessage(statusMessage) {
 					new ButtonBuilder()
 						.setCustomId('playerlist')
 						.setEmoji('📊')
-						.setLabel('Показать список игроков')
+						.setLabel('Playerlist')
 						.setStyle(ButtonStyle.Success)
 				);
 			}
@@ -239,14 +239,14 @@ client.on('interactionCreate', interaction => {
 		}).then((state) => {
 			let embed = new EmbedBuilder();
 
-			embed.setTitle('Список игроков ('+state.players.length + "/" + state.maxplayers+'):');
+			embed.setTitle('Playerlist ('+state.players.length + "/" + state.maxplayers+'):');
 			embed.setColor(config["server_color"]);
 
 			embed = getPlayerlist(state, embed, true);
 
 			interaction.reply({ embeds: [embed], ephemeral: true });
 		}).catch(() => {
-			interaction.reply({ content: "Не смог получить список игроков. Возможно, сервер оффлайн.", ephemeral: true });
+			interaction.reply({ content: "Coundn't retrieve playerlist, it's possible the server is offline.", ephemeral: true });
 		});
 	}
 
@@ -272,7 +272,7 @@ function generateStatusEmbed() {
 
 	let serverTimeString = currentTime.toLocaleString('ru', { timeZone: config['timezone'] });
 
-	embed.setFooter({ text: 'Время сервера : ' + serverTimeString + '\n' + ticEmojy + ' ' + "Последнее обновление" });
+	embed.setFooter({ text: 'Server time : ' + serverTimeString + '\n' + ticEmojy + ' ' + "Last updated" });
 
 	// query gamedig
 	return gamedig.query({
@@ -303,24 +303,24 @@ function generateStatusEmbed() {
 		};
 
 		// server name field
-		embed.addFields({ name: "Название сервера" + ' :', value: serverName });
+		embed.addFields({ name: "Server name" + ' :', value: serverName });
 
 		// basic server info
 		if (!config["minimal"]) {
 			embed.addFields(
-				{ name: "Прямое подключение" + ' :', value: "`" + state.connect + "`", inline: true },
-				{ name: "Режим игры" + ' :', value: (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), inline: true }
+				{ name: "Direct connect" + ' :', value: "`" + state.connect + "`", inline: true },
+				{ name: "Gamemode" + ' :', value: (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), inline: true }
 			);
 			if (state.map == "") {
 				embed.addFields({ name: "\u200B", value: "\u200B", inline: true });
 			} else {
-				embed.addFields({ name: "Карта" + ' :', value: state.map, inline: true });
+				embed.addFields({ name: "Map" + ' :', value: state.map, inline: true });
 			};
 		};
 
 		embed.addFields(
-			{ name: "Статус" + ' :', value: "✅ " + "Онлайн", inline: true },
-			{ name: "Кол-во игроков" + ' :', value: state.players.length + "/" + state.maxplayers, inline: true },
+			{ name: "Status" + ' :', value: "✅ " + "Online", inline: true },
+			{ name: "Player count" + ' :', value: state.players.length + "/" + state.maxplayers, inline: true },
 			{ name: '\u200B', value: '\u200B', inline: true }
 		);
 
@@ -330,7 +330,7 @@ function generateStatusEmbed() {
 		};
 
 		// set bot activity
-		client.user.setActivity("✅ Онлайн: " + state.players.length + "/" + state.maxplayers, { type: 'WATCHING' });
+		client.user.setActivity("✅ Online: " + state.players.length + "/" + state.maxplayers, { type: 'WATCHING' });
 
 		// add graph data
 		graphDataPush(currentTime, state.players.length);
@@ -347,11 +347,11 @@ function generateStatusEmbed() {
 		sendError("Couldn't query the server", error);
 
 		// set bot activity
-		client.user.setActivity("❌ Оффлайн.", { type: 'WATCHING' });
+		client.user.setActivity("❌ Offline.", { type: 'WATCHING' });
 
 		// offline status message
 		embed.setColor('#ff0000');
-		embed.setTitle('❌ ' + "Сервен оффлайн" + '.');
+		embed.setTitle('❌ ' + "Server offline" + '.');
 
 		// add graph data
 		graphDataPush(currentTime, 0);
@@ -389,7 +389,7 @@ function getPlayerlist(state, embed, isInline) {
 	);
 
 	// declare field label
-	let field_label = "Время и Ник";
+	let field_label = "Time and nickname";
 
 	let fields = [];
 	let j = 0;
@@ -536,7 +536,7 @@ async function generateGraph() {
 				data: {
 					labels: graph_labels,
 					datasets: [{
-						label: 'кол-во игроков',
+						label: 'player count',
 						data: graph_datas,
 
 						pointRadius: 0,
