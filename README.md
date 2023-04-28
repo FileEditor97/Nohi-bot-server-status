@@ -6,7 +6,7 @@ This bot is for self-hosting and may/will not work for huge amount of data. Sour
 
 **USER INTERFACE IS IN ENGLISH**
 **ИНТЕРФЕЙС НА АНГЛИЙСКОМ**
-[See all available languages here / Все доступные языки тут] (https://github.com/FileEditor97/Nohi-bot-server-status/branches)
+[See all available languages here / Все доступные языки тут](https://github.com/FileEditor97/Nohi-bot-server-status/branches)
 
 **NOTE: As i'm still learning js, there may be some errors and bad implimentations. If you hava any suggestions, contact me bellow.**  
 
