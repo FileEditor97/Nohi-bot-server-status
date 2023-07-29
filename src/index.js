@@ -26,10 +26,10 @@ if (!fs.existsSync(__dirname + "/temp/data")){
 };
 
 //---------------------------------------------------------------------------------------------------
+const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 function getTime() {
-	return new Date().toISOString().
-  		replace(/T/, ' ').      // replace T with a space
-  		replace(/\..+/, '')     // delete the dot and everything after
+	return new Date().toLocaleString("en-GB", timeZone)
+		.replace(/,/, "")
 }
 
 // resolve discord.com

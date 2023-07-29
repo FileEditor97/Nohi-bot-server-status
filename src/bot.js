@@ -77,7 +77,6 @@ async function SleepCanceable(ms) {
 
 //----------------------------------------------------------------------------------------------------------
 // create client
-require('dotenv').config();
 const {Client, EmbedBuilder, AttachmentBuilder, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle} = require('discord.js');
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
@@ -281,7 +280,7 @@ function generateStatusEmbed() {
 		port: config["server_port"],
 
 		maxAttempts: 5,
-		socketTimeout: 2000,
+		socketTimeout: 10000,
 		givenPortOnly: true,
 	}).then((state) => {
 		// set embed color
