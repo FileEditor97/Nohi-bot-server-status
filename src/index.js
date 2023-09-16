@@ -26,6 +26,7 @@ if (!fs.existsSync(__dirname + "/temp/data")){
 };
 
 //---------------------------------------------------------------------------------------------------
+const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
 function getTime() {
 	return new Date().toLocaleString("en-GB", timeZone)
 		.replace(/,/, "")
