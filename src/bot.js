@@ -200,7 +200,9 @@ async function startStatusMessage(statusMessage) {
 			}).then(() => setTimeout(20000).finally(() => {
 				row.components[0].setDisabled(false);
 				statusMessage.edit({ components: [row] });
-			}));
+			})).catch(error => {
+				sendError("Couldn't edit embed message.", error);
+			});
 		} catch (error) {
 			sendError("Couldn't edit embed message.", error);
 		};
@@ -232,9 +234,8 @@ client.on('interactionCreate', interaction => {
 			port: config["server_port"],
 
 			maxAttempts: 1,
-			socketTimeout: 1000,
-			givenPortOnly: true,
-			debug: false
+			socketTimeout: 1600,
+			givenPortOnly: true
 		}).then((state) => {
 			let embed = new EmbedBuilder();
 
@@ -280,8 +281,9 @@ function generateStatusEmbed() {
 		port: config["server_port"],
 
 		maxAttempts: 5,
-		socketTimeout: 10000,
-		givenPortOnly: true,
+		socketTimeout: 4000,
+		attemptTimeout: 20000,
+		givenPortOnly: true
 	}).then((state) => {
 		// set embed color
 		embed.setColor(config["server_color"]);
@@ -342,8 +344,8 @@ function generateStatusEmbed() {
 		};
 		
 		return embed;
-	}).catch((error) => {
-		sendError("Couldn't query the server", error);
+	}).catch(() => {
+		sendError("Couldn't query the server");
 
 		// set bot activity
 		client.user.setActivity("❌ Оффлайн.", { type: 'WATCHING' });
