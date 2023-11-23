@@ -1,6 +1,6 @@
 {
   "name": "game-server-status",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "discord bot",
   "repository": "github:FileEditor97/Nohi-bot-server-status",
   "main": "index.js",
@@ -18,7 +18,7 @@
     "chartjs-node-canvas": "^4.1.6",
     "date-fns": "^2.30.0",
     "date-fns-tz": "2.0.0",
-    "discord.js": "^14.13.0",
+    "discord.js": "^14.14.1",
     "gamedig": "^4.1.0"
   },
   "engines": {

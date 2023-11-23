@@ -15,7 +15,7 @@ This bot is for self-hosting and may/will not work for huge amount of data. Sour
 - [TheProKoen](https://github.com/TheProKoen) and [rizkychi](https://github.com/rizkychi) for inspiration
 
 ## Contacts
-**Discord:** GreenLord#0593
+**Discord:** @fileeditor
 
 ## WIKI
 https://github.com/FileEditor97/Nohi-bot-server-status/wiki
