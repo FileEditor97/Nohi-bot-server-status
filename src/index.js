@@ -9,7 +9,7 @@
 // read configs
 const fs = require('fs');
 if (!fs.existsSync(__dirname + '/config.json')) {
-	console.warn("Config file not found! Check README.md for config.json file and place it in '"+__dirname+"' folder.");
+	console.error("Config file not found! Check README.md for config.json file and place it in '"+__dirname+"' folder.");
 	process.exit(0);
 }
 const config = JSON.parse(fs.readFileSync(__dirname + '/config.json', 'utf8'));
@@ -35,33 +35,40 @@ function getTime() {
 // resolve discord.com
 require('dns').resolve('www.discord.com', function(err) {
 	if (err) {
-		console.log("No connection to Discord");
+		console.log('[%s]: No connection to Discord', getTime());
 		process.exit(1);
 	} else {
-		console.log("Connected to Discord");
+		console.log('[%s]: Connected to Discord', getTime());
 	}
 });
 
 // initiation
 const ChildProcess = require('child_process');
-var instances = [];
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function createInstances(count) {
+	for (let i = 0; i < count; i++) {
+		// create child process for every instance
+		let instance = ChildProcess.fork(__dirname + '/bot.js');
+		
+		instance.on('message', (m) => {
+			if (m.error) {
+				console.error('[%s][%s]: %s\n%s', getTime(), m.id, m.message, m.error);
+			} else {
+				console.log('[%s][%s]: %s', getTime(), m.id, m.message);
+			}
+		});
+		
+		// communicate id to instance
+		instance.send({id: i});
+
+		// wait
+		await sleep(4000);
+	}
+}
 
 // start instances
-for (let i = 0; i < config["instances"].length; i++) {
-	// create child process for every instance
-	let instance = ChildProcess.fork(__dirname + '/bot.js');
-	
-	instance.on('message', (m) => {
-		if (m.error) {
-			console.error('[%s][%s]: %s\n%s', getTime(), m.id, m.message, m.error);
-		} else {
-			console.log('[%s][%s]: %s', getTime(), m.id, m.message);
-		}
-	});
-	
-	// communicate id to instance
-	instance.send({id: i});
-	
-	// push to instances list
-	instances.push(instance);
-};
+createInstances(config["instances"].length)

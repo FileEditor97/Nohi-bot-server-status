@@ -77,7 +77,7 @@ async function SleepCanceable(ms) {
 
 //----------------------------------------------------------------------------------------------------------
 // create client
-const {Client, EmbedBuilder, AttachmentBuilder, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle} = require('discord.js');
+const {Client, EmbedBuilder, AttachmentBuilder, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType} = require('discord.js');
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
@@ -88,7 +88,7 @@ client.on('ready', async () => {
 
 	// wait until process instance id received
 	while (instanceId < 0) {
-		await Sleep(1000);
+		await Sleep(2000);
 	};
 
 	// get channel
@@ -197,7 +197,7 @@ async function startStatusMessage(statusMessage) {
 			statusMessage.edit({
 				embeds: [embed], components: [row],
 				files: file
-			}).then(() => setTimeout(20000).finally(() => {
+			}).then(() => setTimeout(30000).finally(() => {
 				row.components[0].setDisabled(false);
 				statusMessage.edit({ components: [row] });
 			})).catch(error => {
@@ -234,7 +234,7 @@ client.on('interactionCreate', interaction => {
 			port: config["server_port"],
 
 			maxAttempts: 1,
-			socketTimeout: 1600,
+			socketTimeout: 1500,
 			givenPortOnly: true
 		}).then((state) => {
 			let embed = new EmbedBuilder();
@@ -245,7 +245,8 @@ client.on('interactionCreate', interaction => {
 			embed = getPlayerlist(state, embed, true);
 
 			interaction.reply({ embeds: [embed], ephemeral: true });
-		}).catch(() => {
+		}).catch((error) => {
+			sendError("Coundn't retrieve playerlist", error);
 			interaction.reply({ content: "Coundn't retrieve playerlist, it's possible the server is offline.", ephemeral: true });
 		});
 	}
@@ -280,9 +281,9 @@ function generateStatusEmbed() {
 		host: config["server_host"],
 		port: config["server_port"],
 
-		maxAttempts: 5,
-		socketTimeout: 4000,
-		attemptTimeout: 20000,
+		maxAttempts: 8,
+		socketTimeout: 3000,
+		attemptTimeout: 24000,
 		givenPortOnly: true,
 	}).then((state) => {
 		// set embed color
@@ -331,7 +332,7 @@ function generateStatusEmbed() {
 		};
 
 		// set bot activity
-		client.user.setActivity("✅ Online: " + state.players.length + "/" + state.maxplayers, { type: 'WATCHING' });
+		client.user.setActivity("✅ Online: " + state.players.length + "/" + state.maxplayers, { type: ActivityType.Watching });
 
 		// add graph data
 		graphDataPush(currentTime, state.players.length);
@@ -344,11 +345,11 @@ function generateStatusEmbed() {
 		};
 		
 		return embed;
-	}).catch(() => {
-		sendError("Couldn't query the server");
+	}).catch((error) => {
+		sendError("Couldn't query the server", error);
 
 		// set bot activity
-		client.user.setActivity("❌ Offline.", { type: 'WATCHING' });
+		client.user.setActivity("❌ Offline.", { type: ActivityType.Watching });
 
 		// offline status message
 		embed.setColor('#ff0000');
