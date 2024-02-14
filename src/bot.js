@@ -234,7 +234,7 @@ client.on('interactionCreate', interaction => {
 			port: config["server_port"],
 
 			maxAttempts: 1,
-			socketTimeout: 1500,
+			socketTimeout: 2000,
 			givenPortOnly: true
 		}).then((state) => {
 			let embed = new EmbedBuilder();
@@ -281,9 +281,9 @@ function generateStatusEmbed() {
 		host: config["server_host"],
 		port: config["server_port"],
 
-		maxAttempts: 8,
+		maxAttempts: 3,
 		socketTimeout: 3000,
-		attemptTimeout: 24000,
+		attemptTimeout: 10000,
 		givenPortOnly: true,
 	}).then((state) => {
 		// set embed color
@@ -292,17 +292,6 @@ function generateStatusEmbed() {
 		// set server name
 		let serverName = config["server_name"];
 		if (serverName == "") serverName = state.name;
-
-		// refactor server name
-		for (let i = 0; i < serverName.length; i++) {
-			if (serverName[i] == "^") {
-				serverName = serverName.slice(0, i) + " " + serverName.slice(i + 2);
-			} else if (serverName[i] == "█") {
-				serverName = serverName.slice(0, i) + " " + serverName.slice(i + 1);
-			} else if (serverName[i] == "�") {
-				serverName = serverName.slice(0, i) + " " + serverName.slice(i + 2);
-			};
-		};
 
 		// server name field
 		embed.addFields({ name: "Server name" + ' :', value: serverName });

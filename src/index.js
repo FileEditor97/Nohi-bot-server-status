@@ -66,7 +66,7 @@ async function createInstances(count) {
 		instance.send({id: i});
 
 		// wait
-		await sleep(4000);
+		await sleep(20000);
 	}
 }
 
