@@ -1,6 +1,6 @@
 {
   "name": "game-server-status",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "discord bot",
   "repository": "github:FileEditor97/Nohi-bot-server-status",
   "main": "index.js",
