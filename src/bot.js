@@ -486,7 +486,7 @@ const width = 600;
 const height = 400;
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 require('chartjs-adapter-date-fns');
-const { utcToZonedTime } = require('date-fns-tz');
+const { toZonedTime } = require('date-fns-tz');
 var canvasRenderService = new ChartJSNodeCanvas({ width, height });
 var timeFormat = {
 	'millisecond': 'HH:mm',
@@ -517,7 +517,7 @@ async function generateGraph() {
 
 			// set data
 			for (let i = 0; i < data.length; i += 1) {
-				graph_labels.push(utcToZonedTime(data[i]["x"], config['timezone']));
+				graph_labels.push(toZonedTime(data[i]["x"], config['timezone']));
 				graph_datas.push(data[i]["y"]);
 			};
 
