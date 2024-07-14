@@ -233,7 +233,7 @@ client.on('interactionCreate', interaction => {
 			host: config["server_host"],
 			port: config["server_port"],
 
-			maxAttempts: 1,
+			maxRetries: 1,
 			socketTimeout: 2000,
 			givenPortOnly: true
 		}).then((state) => {
@@ -281,7 +281,7 @@ function generateStatusEmbed() {
 		host: config["server_host"],
 		port: config["server_port"],
 
-		maxAttempts: 3,
+		maxRetries: 3,
 		socketTimeout: 3000,
 		attemptTimeout: 10000,
 		givenPortOnly: true,
