@@ -45,30 +45,18 @@ require('dns').resolve('www.discord.com', function(err) {
 // initiation
 const ChildProcess = require('child_process');
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-async function createInstances(count) {
-	for (let i = 0; i < count; i++) {
-		// create child process for every instance
-		let instance = ChildProcess.fork(__dirname + '/bot.js');
-		
-		instance.on('message', (m) => {
-			if (m.error) {
-				console.error('[%s][%s]: %s\n%s', getTime(), m.id, m.message, m.error);
-			} else {
-				console.log('[%s][%s]: %s', getTime(), m.id, m.message);
-			}
-		});
-		
-		// communicate id to instance
-		instance.send({id: i});
-
-		// wait
-		await sleep(20000);
-	}
+async function createInstance() {
+	// create child process
+	let instance = ChildProcess.fork(__dirname + '/bot.js');
+	
+	instance.on('message', (m) => {
+		if (m.error) {
+			console.error('[%s]: %s\n%s', getTime(), m.message, m.error);
+		} else {
+			console.log('[%s]: %s', getTime(), m.message);
+		}
+	});
 }
 
 // start instances
-createInstances(config["instances"].length)
+createInstance()

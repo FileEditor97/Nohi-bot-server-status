@@ -10,43 +10,22 @@
 const fs = require('fs');
 var config = JSON.parse(fs.readFileSync(__dirname + '/config.json', 'utf8'));
 
-// await for instance id
-var instanceId = -1;
+let serversOffline = new Set();
 
 async function sendMsg(text) {
 	process.send({
-		id: instanceId,
 		message: text,
 		error: undefined,
 	});
 }
 async function sendError(text, err) {
 	process.send({
-		id: instanceId,
 		message: text,
 		error: (err == undefined ? "No message" : err.stack),
 	});
 }
 
-process.on('message', (m) => {
-	// get message type
-	if (Object.keys(m)[0] == "id") {
-		// set instance id
-		instanceId = m.id;
-
-		// send ok signal to main process
-		sendMsg("ID received by instance.");
-
-		// init bot
-		init();
-	}
-});
-
 function init() {
-	// get config
-	config["instances"][instanceId]["statusUpdateTime"] = config["statusUpdateTime"];
-	config = config["instances"][instanceId];
-
 	// set config defaults
 	if (config["timezone"] == "") config["timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone;
 	
@@ -85,11 +64,6 @@ const client = new Client({
 // once client is ready
 client.on('ready', async () => {
 	sendMsg("Logged in as \"" + client.user.tag + "\".");
-
-	// wait until process instance id received
-	while (instanceId < 0) {
-		await Sleep(2000);
-	};
 
 	// get channel
 	let statusChannel = client.channels.cache.get(config["serverStatusChannelId"]);
@@ -154,6 +128,7 @@ function getLastMessage(statusChannel) {
 //----------------------------------------------------------------------------------------------------------
 // main loops
 const dns = require('dns');
+var tic = false;
 async function startStatusMessage(statusMessage) {
 	while (true) {
 		dns.resolve('www.discord.com', err => {
@@ -162,299 +137,132 @@ async function startStatusMessage(statusMessage) {
 				process.exit(1);
 			}
 		});
-		try {
-			// steam link and refresh button button
-			let row = new ActionRowBuilder()
-				.addComponents(
-					new ButtonBuilder()
-						.setCustomId('refresh')
-						.setEmoji('🔄')
-						.setLabel('Refresh')
-						.setStyle(ButtonStyle.Secondary)
-						.setDisabled()
-				);
-			if (config['steam_connect_button']) {
-				row.addComponents(
-					new ButtonBuilder()
-						.setCustomId('steamLink')
-						.setLabel('Connect')
-						.setStyle(ButtonStyle.Primary)
-				);
-			}
-			if (config["server_playerlist"] == "1") {
-				row.addComponents(
-					new ButtonBuilder()
-						.setCustomId('playerlist')
-						.setEmoji('📊')
-						.setLabel('Playerlist')
-						.setStyle(ButtonStyle.Success)
-				);
+
+		Promise.all(generateStatusEmbed()).then(fields => {
+			let embed = new EmbedBuilder();
+
+			// set embed name and logo
+			if (config["title"] != "") embed.setAuthor({ name: config["title"], iconURL: parse(config["logo"]), url: parse(config["url"]) });
+
+			// set embed times
+			tic = !tic;
+			let ticEmojy = tic ? "⚪" : "⚫";
+
+			let currentTime = new Date();
+
+			embed.setTimestamp(currentTime);
+
+			let serverTimeString = currentTime.toLocaleString('ru', { timeZone: config['timezone'] });
+
+			embed.setFooter({ text: 'Server time : ' + serverTimeString + '\n' + ticEmojy + ' ' + "Last updated" });
+
+			// set color
+			if (serversOffline.length > 0) {
+				embed.setColor('#ff0000');
+			} else {
+				embed.setColor(config["embed_color"]);
+			}	
+
+			// Set fields
+			for (let i=0; i<fields.length; i++) {
+				if (fields[i]["online"]) {
+					embed.addFields({ name: '\u200b\n> '+fields[i]["name"], value: '> ✅ Онлайн', inline: false },
+						{ name: 'Прямое подключение :', value: "`"+fields[i]["host"]+':'+fields[i]["port"]+"`", inline: true },
+						{ name: 'Карта :', value: "`"+fields[i]["map"]+"`", inline: true },
+						{ name: 'Кол-во игроков :', value: fields[i]["count"]+"/"+fields[i]["max"], inline: false });
+				} else {
+					embed.addFields({ name: '\u200b\n> '+fields[i]["name"], value: '❌ Офлайн', inline: false });
+				}
 			}
 
-			let embed = await generateStatusEmbed();
-			let file = config["server_enable_graph"] && fs.existsSync(__dirname + "/temp/graphs/graph_" + instanceId + ".png") ? 
-				[new AttachmentBuilder(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : [];
+			// Set graph if available
+			if (config["server_enable_graph"]) {
+				embed.setImage("attachment://graph.png");
+			};
+			let file = config["server_enable_graph"] && fs.existsSync(__dirname + "/temp/graphs/graph.png") ? 
+				[new AttachmentBuilder(__dirname + "/temp/graphs/graph.png")] : [];
+			
+			// Edit embed
 			statusMessage.edit({
-				embeds: [embed], components: [row],
+				embeds: [embed],
 				files: file
-			}).then(() => setTimeout(30000).finally(() => {
-				row.components[0].setDisabled(false);
-				statusMessage.edit({ components: [row] });
-			})).catch(error => {
+			}).catch(error => {
 				sendError("Couldn't edit embed message.", error);
 			});
-		} catch (error) {
-			sendError("Couldn't edit embed message.", error);
-		};
+		}).catch(e => sendError("Problem with promises.", e));
 
 		await SleepCanceable(config["statusUpdateTime"] * 1000);
 	};
 };
 
-// buttons pressed on status message
-client.on('interactionCreate', interaction => {
-	if (!interaction.isButton()) return;
-
-	// Check for CustomID
-	//  connect button
-	if (interaction.customId == 'steamLink')
-		interaction.reply({ content: 'steam://connect/' + config["server_host"] + ':' + config["server_port"], ephemeral: true })
-
-	//  refresh button
-	else if (interaction.customId == 'refresh') {
-		interaction.deferUpdate();
-		cancelTimeout.abort();
-	}
-
-	//  playerlist button
-	else if (interaction.customId == 'playerlist') {
-		return gamedig.query({
-			type: config["server_type"],
-			host: config["server_host"],
-			port: config["server_port"],
-
-			maxRetries: 1,
-			socketTimeout: 2000,
-			givenPortOnly: true
-		}).then((state) => {
-			let embed = new EmbedBuilder();
-
-			embed.setTitle('Playerlist ('+state.players.length + "/" + state.maxplayers+'):');
-			embed.setColor(config["server_color"]);
-
-			embed = getPlayerlist(state, embed, true);
-
-			interaction.reply({ embeds: [embed], ephemeral: true });
-		}).catch((error) => {
-			sendError("Coundn't retrieve playerlist", error);
-			interaction.reply({ content: "Coundn't retrieve playerlist, it's possible the server is offline.", ephemeral: true });
-		});
-	}
-
-});
-
 //----------------------------------------------------------------------------------------------------------
 // fetch data
-const gamedig = require('gamedig');
-var tic = false;
+const { GameDig } = require('gamedig');
 function generateStatusEmbed() {
-	let embed = new EmbedBuilder();
-
-	// set embed name and logo
-	if (config["server_title"] != "") embed.setAuthor({ name: config["server_title"], iconURL: parse(config["server_logo"]), url: parse(config["server_url"]) });
-
-	// set embed updated time
-	tic = !tic;
-	let ticEmojy = tic ? "⚪" : "⚫";
-
-	let currentTime = new Date();
-
-	embed.setTimestamp(currentTime);
-
-	let serverTimeString = currentTime.toLocaleString('ru', { timeZone: config['timezone'] });
-
-	embed.setFooter({ text: 'Server time : ' + serverTimeString + '\n' + ticEmojy + ' ' + "Last updated" });
+	let promises = [];
 
 	// query gamedig
-	return gamedig.query({
-		type: config["server_type"],
-		host: config["server_host"],
-		port: config["server_port"],
+	const serverType = config["server_type"];
 
-		maxRetries: 3,
-		socketTimeout: 3000,
-		attemptTimeout: 10000,
-		givenPortOnly: true,
-	}).then((state) => {
-		// set embed color
-		embed.setColor(config["server_color"]);
+	for (let serverId=0; serverId<config["servers"].length; serverId++) {
+		const host = config["servers"][serverId]["host"];
+		const port = config["servers"][serverId]["port"];
 
-		// set server name
-		let serverName = config["server_name"];
-		if (serverName == "") serverName = state.name;
-
-		// server name field
-		embed.addFields({ name: "Server name" + ' :', value: serverName });
-
-		// basic server info
-		if (!config["minimal"]) {
-			embed.addFields(
-				{ name: "Direct connect" + ' :', value: "`" + state.connect + "`", inline: true },
-				{ name: "Gamemode" + ' :', value: (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), inline: true }
-			);
-			if (state.map == "") {
-				embed.addFields({ name: "\u200B", value: "\u200B", inline: true });
-			} else {
-				embed.addFields({ name: "Map" + ' :', value: state.map, inline: true });
-			};
+		let data = {
+			"name": config["servers"][serverId]["name"],
+			"online": false,
+			"count": 0,
+			"max": 0,
+			"host": host,
+			"port": port,
+			"map": ""
 		};
 
-		embed.addFields(
-			{ name: "Status" + ' :', value: "✅ " + "Online", inline: true },
-			{ name: "Player count" + ' :', value: state.players.length + "/" + state.maxplayers, inline: true },
-			{ name: '\u200B', value: '\u200B', inline: true }
-		);
-
-		// player list
-		if (config["server_playerlist"] == "2" && state.players.length > 0) {
-			embed = getPlayerlist(state, embed, false);
-		};
-
-		// set bot activity
-		client.user.setActivity("✅ Online: " + state.players.length + "/" + state.maxplayers, { type: ActivityType.Watching });
-
-		// add graph data
-		graphDataPush(currentTime, state.players.length);
-
-		// set graph image
-		if (config["server_enable_graph"]) {
-			embed.setImage(
-				"attachment://graph_" + instanceId + ".png"
-			);
-		};
+		let currentTime = new Date();
 		
-		return embed;
-	}).catch((error) => {
-		sendError("Couldn't query the server", error);
+		promises.push(GameDig.query({
+			type: serverType,
+			host: host,
+			port: port,
+	
+			maxRetries: 3,
+			socketTimeout: 3000,
+			attemptTimeout: 10000,
+			givenPortOnly: true,
+		}).then((state) => {	
+			data["online"] = true;
 
-		// set bot activity
-		client.user.setActivity("❌ Offline.", { type: ActivityType.Watching });
+			data["count"] = state.players.length;
+			data["max"] = state.maxplayers;
 
-		// offline status message
-		embed.setColor('#ff0000');
-		embed.setTitle('❌ ' + "Server offline" + '.');
+			data["map"] = state.map;
+	
+			// add graph data
+			graphDataPush(serverId, currentTime, state.players.length);
+			
+			return data;
+		}).catch((error) => {
+			sendError("Couldn't query the server", error);
+	
+			// add server to offline list
+			serversOffline.add(serverId);
+	
+			// add graph data
+			graphDataPush(serverId, currentTime, 0);
 
-		// add graph data
-		graphDataPush(currentTime, 0);
+			return data;
+		}));
+	}
 
-		// set graph image
-		if (config["server_enable_graph"]) {
-			embed.setImage(
-				"attachment://graph_" + instanceId + ".png"
-			);
-		};
-		return embed;
-	});
+	return promises;
 };
 
-function getPlayerlist(state, embed, isInline) {
-	// recover game data
-	let dataKeys = Object.keys(state.players[0]);
-
-	// set name as first
-	if (dataKeys.includes('name')) {
-		dataKeys = dataKeys.filter(e => e !== 'name');
-		dataKeys.splice(0, 0, 'name');
-	};
-
-	// remove some unwanted data
-	dataKeys = dataKeys.filter(e =>
-		e !== 'frags' &&
-		e !== 'score' &&
-		e !== 'guid' &&
-		e !== 'id' &&
-		e !== 'team' &&
-		e !== 'squad' &&
-		// e !== 'raw' && // need to parse raw data -> time and score
-		e !== 'skin'
-	);
-
-	// declare field label
-	let field_label = "Time and nickname";
-
-	let fields = [];
-	let j = 0;
-	fields[j] = "```\n";
-	for (let i = 0; i < state.players.length; i++) {
-		// devides playerlist into multiple fields if character limit reached for one field
-		if ((i + 1 - j * 30) > 30) {
-			fields[j] += "```";
-			j++;
-			fields[j] = "```\n";
-			/* field_value += "и еще " + (state.players.length - 64) + "...";
-			break; */
-		}
-
-		// set player data
-		if (state.players[i]['name'] != undefined) {
-			let player_data = null;
-
-			// adding numbers to beginning of name list
-			let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
-			if (config["server_enable_numbers"]) {
-				fields[j] += index + '〕';
-			};
-
-			// player time data
-			player_data = state.players[i]['raw'].time;
-			if (player_data == undefined) {
-				player_data = 0;
-			};
-			// process time
-			let date = new Date(player_data * 1000).toISOString().substring(11, 19).split(":");
-			date = date[0] + ":" + date[1];
-			fields[j] += date;
-
-			fields[j] += "｜"
-
-			// player name data
-			player_data = state.players[i]['name'];
-			if (player_data == "") {
-				player_data = "*loading*";
-			};
-			// process name
-			for (let k = 0; k < player_data.length; k++) {
-				if (player_data[k] == "^") {
-					player_data = player_data.slice(0, k) + " " + player_data.slice(k + 2);
-				};
-			};
-			// handle very long strings
-			// maximum char. for every field is 1024, this implimentation reaches ~1000
-			// 7 chars for brackets and 32 (9+22+1) per line
-			player_data = (player_data.length > 22) ? player_data.substring(0, 22 - 3) + "..." : player_data;
-
-			fields[j] += player_data;
-
-		};
-		fields[j] += "\n";
-	};
-	fields[j] += "```";
-
-	// add fields to embed
-	embed.addFields({ name: field_label + ' :', value: fields[0], inline: isInline });
-	for (let i = 1; i < fields.length; i++) {
-		embed.addFields({ name: '\u200B', value: fields[i], inline: isInline });
-	};
-
-	return embed;
-};
-
-function graphDataPush(time, nbrPlayers) {
+function graphDataPush(serverId, time, nbrPlayers) {
 	// save data to json file
-	fs.readFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', (err, data) => {
+	fs.readFile(__dirname + '/temp/data/serverData_' + serverId + '.json', (err, data) => {
 		// create file if does not exist
 		if (err) {
-			fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify([]), (error) => {if (error) throw error});
+			fs.writeFile(__dirname + '/temp/data/serverData_' + serverId + '.json', JSON.stringify([]), (error) => {if (error) throw error});
 			return;
 		};
 
@@ -476,7 +284,7 @@ function graphDataPush(time, nbrPlayers) {
 		json.push({ "x": time, "y": nbrPlayers });
 
 		// append data file 
-		fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify(json), () => {});
+		fs.writeFile(__dirname + '/temp/data/serverData_' + serverId + '.json', JSON.stringify(json), () => {});
 	});
 };
 
@@ -503,41 +311,47 @@ async function generateGraph() {
 	while (client.token != null) { // client.token is not null if it's alive (logged in)
 		try {
 
-			// generate graph
-			let data = [];
-
-			try {
-				data = JSON.parse(fs.readFileSync(__dirname + '/temp/data/serverData_' + instanceId + '.json', { encoding: 'utf8', flag: 'r' }));
-			} catch (error) {
-				data = [];
-			}
-
+			// servers
+			let graph_datasets = [];
 			let graph_labels = [];
-			let graph_datas = [];
+			for (let serverId=0; serverId<config["servers"].length; serverId++) {
+				// generate graph
+				let data = [];
+				try {
+					data = JSON.parse(fs.readFileSync(__dirname + '/temp/data/serverData_' + serverId + '.json', { encoding: 'utf8', flag: 'r' }));
+				} catch (error) {
+					data = [];
+				}
 
-			// set data
-			for (let i = 0; i < data.length; i += 1) {
-				graph_labels.push(toZonedTime(data[i]["x"], config['timezone']));
-				graph_datas.push(data[i]["y"]);
-			};
+				const addLabels = (graph_labels.length == 0);
+				let server_datas = [];
+				for (let j = 0; j < data.length; j++) {
+					server_datas.push(data[j]["y"]);
+					if (addLabels) {
+						graph_labels.push(toZonedTime(data[j]["x"], config['timezone']));
+					}
+				}
+				
+				graph_datasets.push({
+					label: config["servers"][serverId]["name"],
+					data: server_datas,
+
+					pointRadius: 0,
+
+					backgroundColor: hexToRgb(config["servers"][serverId]["color"], 0.2),
+					borderColor: hexToRgb(config["servers"][serverId]["color"], 1.0),
+
+					fill: false,
+					spanGaps: true // enable for a single dataset
+				})
+			}
 
 			let graphConfig = {
 				type: 'line',
 
 				data: {
 					labels: graph_labels,
-					datasets: [{
-						label: 'player count',
-						data: graph_datas,
-
-						pointRadius: 0,
-
-						backgroundColor: hexToRgb(config["server_color"], 0.2),
-						borderColor: hexToRgb(config["server_color"], 1.0),
-
-						fill: true,
-						spanGaps: true // enable for a single dataset
-					}]
+					datasets: graph_datasets
 				},
 
 				options: {
@@ -597,7 +411,7 @@ async function generateGraph() {
 							radius: 0
 						},
 						line: {
-							borderWidth: 2 // line width
+							borderWidth: 3 // line width
 						}
 					},
 					animation: {
@@ -610,7 +424,7 @@ async function generateGraph() {
 				},
 			};
 
-			let graphFile = 'graph_' + instanceId + '.png';
+			let graphFile = 'graph.png';
 
 			canvasRenderService.renderToBuffer(graphConfig).then(data => {
 				fs.writeFileSync(__dirname + '/temp/graphs/' + graphFile, data);
@@ -622,7 +436,7 @@ async function generateGraph() {
 			sendError("Couldn't generate graph image.", error);
 		};
 
-		await Sleep(60 * 1000); // every minute
+		await Sleep(60 * 1000); // every 2 minutes
 	};
 };
 
@@ -631,3 +445,6 @@ function hexToRgb(hex, opacity) {
 	var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
 	return result ? "rgba(" + parseInt(result[1], 16) + ", " + parseInt(result[2], 16) + ", " + parseInt(result[3], 16) + ", " + opacity + ")" : null;
 };
+
+// Start
+init();
