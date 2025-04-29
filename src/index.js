@@ -1,7 +1,7 @@
 /*
 	Author: Ramzi Sah#2992
 	Fork by: FileEditor97
-	Desription:
+	Description:
 		creates multiple instances of the bot
 */
 //---------------------------------------------------------------------------------------------------
@@ -46,6 +46,10 @@ require('dns').resolve('www.discord.com', function(err) {
 const ChildProcess = require('child_process');
 var instances = [];
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // start instances
 for (let i = 0; i < config["instances"].length; i++) {
 	// create child process for every instance
@@ -64,4 +68,7 @@ for (let i = 0; i < config["instances"].length; i++) {
 	
 	// push to instances list
 	instances.push(instance);
+
+	// wait
+	await sleep(20000); // wait 20 seconds
 };

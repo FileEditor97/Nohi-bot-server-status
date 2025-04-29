@@ -1,9 +1,9 @@
 /*
 	Author: Ramzi Sah#2992
 	Fork by: FileEditor97
-	Desription:
+	Description:
 		Main code
-		Retrieves status message or creates new, updates every sycle time or on request
+		Retrieves status message or creates new, updates every X time or on request
 */
 
 // read configs
@@ -77,7 +77,7 @@ async function SleepCanceable(ms) {
 
 //----------------------------------------------------------------------------------------------------------
 // create client
-const {Client, EmbedBuilder, AttachmentBuilder, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle} = require('discord.js');
+const {Client, EmbedBuilder, AttachmentBuilder, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType} = require('discord.js');
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
@@ -197,7 +197,7 @@ async function startStatusMessage(statusMessage) {
 			statusMessage.edit({
 				embeds: [embed], components: [row],
 				files: file
-			}).then(() => setTimeout(20000).finally(() => {
+			}).then(() => setTimeout(30000).finally(() => {
 				row.components[0].setDisabled(false);
 				statusMessage.edit({ components: [row] });
 			})).catch(error => {
@@ -226,7 +226,7 @@ client.on('interactionCreate', interaction => {
 		cancelTimeout.abort();
 	}
 
-	//  playerlist button
+	//  players list button
 	else if (interaction.customId == 'playerlist') {
 		return gamedig.query({
 			type: config["server_type"],
@@ -234,7 +234,7 @@ client.on('interactionCreate', interaction => {
 			port: config["server_port"],
 
 			maxAttempts: 1,
-			socketTimeout: 1600,
+			socketTimeout: 2000,
 			givenPortOnly: true
 		}).then((state) => {
 			let embed = new EmbedBuilder();
@@ -264,7 +264,7 @@ function generateStatusEmbed() {
 
 	// set embed updated time
 	tic = !tic;
-	let ticEmojy = tic ? "⚪" : "⚫";
+	let ticEmoji = tic ? "⚪" : "⚫";
 
 	let currentTime = new Date();
 
@@ -272,7 +272,7 @@ function generateStatusEmbed() {
 
 	let serverTimeString = currentTime.toLocaleString('ru', { timeZone: config['timezone'] });
 
-	embed.setFooter({ text: 'Время сервера : ' + serverTimeString + '\n' + ticEmojy + ' ' + "Последнее обновление" });
+	embed.setFooter({ text: 'Время сервера : ' + serverTimeString + '\n' + ticEmoji + ' ' + "Последнее обновление" });
 
 	// query gamedig
 	return gamedig.query({
@@ -280,9 +280,9 @@ function generateStatusEmbed() {
 		host: config["server_host"],
 		port: config["server_port"],
 
-		maxAttempts: 5,
-		socketTimeout: 4000,
-		attemptTimeout: 20000,
+		maxAttempts: 3,
+		socketTimeout: 3000,
+		attemptTimeout: 9000,
 		givenPortOnly: true
 	}).then((state) => {
 		// set embed color
@@ -293,15 +293,15 @@ function generateStatusEmbed() {
 		if (serverName == "") serverName = state.name;
 
 		// refactor server name
-		for (let i = 0; i < serverName.length; i++) {
-			if (serverName[i] == "^") {
-				serverName = serverName.slice(0, i) + " " + serverName.slice(i + 2);
-			} else if (serverName[i] == "█") {
-				serverName = serverName.slice(0, i) + " " + serverName.slice(i + 1);
-			} else if (serverName[i] == "�") {
-				serverName = serverName.slice(0, i) + " " + serverName.slice(i + 2);
-			};
-		};
+		//for (let i = 0; i < serverName.length; i++) {
+		//	if (serverName[i] == "^") {
+		//		serverName = serverName.slice(0, i) + " " + serverName.slice(i + 2);
+		//	} else if (serverName[i] == "█") {
+		//		serverName = serverName.slice(0, i) + " " + serverName.slice(i + 1);
+		//	} else if (serverName[i] == " ") {
+		//		serverName = serverName.slice(0, i) + " " + serverName.slice(i + 2);
+		//	};
+		//};
 
 		// server name field
 		embed.addFields({ name: "Название сервера" + ' :', value: serverName });
@@ -331,7 +331,7 @@ function generateStatusEmbed() {
 		};
 
 		// set bot activity
-		client.user.setActivity("✅ Онлайн: " + state.players.length + "/" + state.maxplayers, { type: 'WATCHING' });
+		client.user.setActivity("✅ Онлайн: " + state.players.length + "/" + state.maxplayers, { type: ActivityType.Watching });
 
 		// add graph data
 		graphDataPush(currentTime, state.players.length);
@@ -344,15 +344,15 @@ function generateStatusEmbed() {
 		};
 		
 		return embed;
-	}).catch(() => {
-		sendError("Couldn't query the server");
+	}).catch((error) => {
+		sendError("Couldn't query the server", error);
 
 		// set bot activity
-		client.user.setActivity("❌ Оффлайн.", { type: 'WATCHING' });
+		client.user.setActivity("❌ Оффлайн.", { type: ActivityType.Watching });
 
 		// offline status message
 		embed.setColor('#ff0000');
-		embed.setTitle('❌ ' + "Сервен оффлайн" + '.');
+		embed.setTitle('❌ ' + "Сервер оффлайн" + '.');
 
 		// add graph data
 		graphDataPush(currentTime, 0);
@@ -396,7 +396,7 @@ function getPlayerlist(state, embed, isInline) {
 	let j = 0;
 	fields[j] = "```\n";
 	for (let i = 0; i < state.players.length; i++) {
-		// devides playerlist into multiple fields if character limit reached for one field
+		// divides players list into multiple fields if character limit reached for one field
 		if ((i + 1 - j * 30) > 30) {
 			fields[j] += "```";
 			j++;
@@ -439,7 +439,7 @@ function getPlayerlist(state, embed, isInline) {
 				};
 			};
 			// handle very long strings
-			// maximum char. for every field is 1024, this implimentation reaches ~1000
+			// maximum char. for every field is 1024, this implementation reaches ~1000
 			// 7 chars for brackets and 32 (9+22+1) per line
 			player_data = (player_data.length > 22) ? player_data.substring(0, 22 - 3) + "..." : player_data;
 
