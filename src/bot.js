@@ -254,7 +254,7 @@ client.on('interactionCreate', interaction => {
 
 //----------------------------------------------------------------------------------------------------------
 // fetch data
-const gamedig = require('gamedig');
+const { GameDig } = require('gamedig');
 var tic = false;
 function generateStatusEmbed() {
 	let embed = new EmbedBuilder();
@@ -275,7 +275,7 @@ function generateStatusEmbed() {
 	embed.setFooter({ text: 'Время сервера : ' + serverTimeString + '\n' + ticEmoji + ' ' + "Последнее обновление" });
 
 	// query gamedig
-	return gamedig.query({
+	return GameDig.query({
 		type: config["server_type"],
 		host: config["server_host"],
 		port: config["server_port"],
