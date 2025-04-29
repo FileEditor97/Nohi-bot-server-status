@@ -1,9 +1,9 @@
 /*
 	Author: Ramzi Sah#2992
 	Fork by: FileEditor97
-	Desription:
+	Description:
 		Main code
-		Retrieves status message or creates new, updates every sycle time or on request
+		Retrieves status message or creates new, updates every X minutes
 */
 
 // read configs
@@ -104,7 +104,7 @@ async function getStatusMessage(statusChannel) {
 
 	// OR create new message
 	let embed = new EmbedBuilder();
-	embed.setTitle("Starting up the panel...");
+	embed.setTitle("Запускаю панель...");
 	embed.setColor('#ffff00');
 
 	return await statusChannel.send({ embeds: [embed] }).then((sentMessage) => {
@@ -146,7 +146,7 @@ async function startStatusMessage(statusMessage) {
 
 			// set embed times
 			tic = !tic;
-			let ticEmojy = tic ? "⚪" : "⚫";
+			let ticEmoji = tic ? "⚪" : "⚫";
 
 			let currentTime = new Date();
 
@@ -154,7 +154,7 @@ async function startStatusMessage(statusMessage) {
 
 			let serverTimeString = currentTime.toLocaleString('ru', { timeZone: config['timezone'] });
 
-			embed.setFooter({ text: 'Server time : ' + serverTimeString + '\n' + ticEmojy + ' ' + "Last updated" });
+			embed.setFooter({ text: 'Время сервера : ' + serverTimeString + '\n' + ticEmoji + ' ' + "Последнее обновление" });
 
 			// set color
 			if (serversOffline.length > 0) {
@@ -166,14 +166,14 @@ async function startStatusMessage(statusMessage) {
 			// Set fields
 			for (let i=0; i<fields.length; i++) {
 				if (fields[i]["online"]) {
-					embed.addFields({ name: '\u200b\n> '+fields[i]["name"], value: '> ✅ Онлайн', inline: false },
-						{ name: 'Прямое подключение :', value: "`"+fields[i]["host"]+':'+fields[i]["port"]+"`", inline: true },
-						{ name: 'Карта :', value: "`"+fields[i]["map"]+"`", inline: true },
-						{ name: 'Кол-во игроков :', value: fields[i]["count"]+"/"+fields[i]["max"], inline: false });
+					embed.addFields({ name: '\u200b\n> ▶ '+fields[i]["name"], value: '> ✅ Онлайн - '+fields[i]["count"]+"/"+fields[i]["max"], inline: false },
+						{ name: 'Прямое подключение:', value: "`"+fields[i]["host"]+':'+fields[i]["port"]+"`", inline: true },
+						{ name: 'Карта:', value: "`"+fields[i]["map"]+"`", inline: true });
 				} else {
-					embed.addFields({ name: '\u200b\n> '+fields[i]["name"], value: '❌ Офлайн', inline: false });
+					embed.addFields({ name: '\u200b\n> ▶ '+fields[i]["name"], value: '❌ Офлайн', inline: false });
 				}
 			}
+			// { name: 'Кол-во игроков:', value: fields[i]["count"]+"/"+fields[i]["max"], inline: true }
 
 			// Set graph if available
 			if (config["server_enable_graph"]) {
@@ -411,7 +411,7 @@ async function generateGraph() {
 							radius: 0
 						},
 						line: {
-							borderWidth: 3 // line width
+							borderWidth: 2 // line width
 						}
 					},
 					animation: {
@@ -436,7 +436,7 @@ async function generateGraph() {
 			sendError("Couldn't generate graph image.", error);
 		};
 
-		await Sleep(60 * 1000); // every 2 minutes
+		await Sleep(300 * 1000); // every 5 minutes
 	};
 };
 

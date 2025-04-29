@@ -1,5 +1,5 @@
 {
-	"statusUpdateTime" : 60,
+	"statusUpdateTime" : 120,
 	"discordBotToken" : "",
 
 	"serverStatusChannelId" : "",
@@ -10,11 +10,11 @@
 	"logo" : "",
 	"title": "",
 	"url": "",
-	"embed_color": "#00ff00",
+	"embed_color": "#00FF00",
 	"servers": [
 		{
 			"name": "",
-			"color": "#00ff00",
+			"color": "#00FF00",
 			"host": "",
 			"port": ""
 		}
