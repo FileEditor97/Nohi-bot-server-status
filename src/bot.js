@@ -229,6 +229,7 @@ function generateStatusEmbed() {
 			socketTimeout: 3000,
 			attemptTimeout: 10000,
 			givenPortOnly: true,
+			listenUdpPort: 13550
 		}).then((state) => {	
 			data["online"] = true;
 
