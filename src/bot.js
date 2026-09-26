@@ -304,13 +304,36 @@ function graphDataPush(serverId, time, nbrPlayers) {
 	let nbrOld = data.findIndex(point => new Date(point.x).getTime() >= oldest);
 	if (nbrOld > 0) data.splice(0, nbrOld);
 
-	// write to temp file and rename, so file is never read half-written
+	graphDataSave(serverId, JSON.stringify(data));
+}
+
+// write to temp file and rename, so file is never read half-written
+// if temp file can't be created (no write permission on the folder), overwrite the file directly
+let graphDataAtomic = true;
+let graphDataWriteFailed = []; // log write errors only once per server, not every update
+
+function graphDataSave(serverId, json) {
 	let file = graphDataFile(serverId);
-	fs.writeFile(file + '.tmp', JSON.stringify(data), (error) => {
-		if (error) return sendError("Couldn't write JSON file.", error);
-		fs.rename(file + '.tmp', file, (error) => {
-			if (error) sendError("Couldn't write JSON file.", error);
-		});
+	let onDone = (error) => {
+		if (error) {
+			if (!graphDataWriteFailed[serverId]) sendError("Couldn't write JSON file, graph data won't survive restart. Check write permissions of '" + __dirname + "/temp/data'.", error);
+			graphDataWriteFailed[serverId] = true;
+		} else {
+			if (graphDataWriteFailed[serverId]) sendMsg("JSON file '" + file + "' is writable again.");
+			graphDataWriteFailed[serverId] = false;
+		}
+	};
+
+	if (!graphDataAtomic) return fs.writeFile(file, json, onDone);
+
+	fs.writeFile(file + '.tmp', json, (error) => {
+		if (error && (error.code === 'EACCES' || error.code === 'EPERM')) {
+			if (graphDataAtomic) sendMsg("Can't create temp file in '" + __dirname + "/temp/data', writing JSON files directly.");
+			graphDataAtomic = false;
+			return fs.writeFile(file, json, onDone);
+		}
+		if (error) return onDone(error);
+		fs.rename(file + '.tmp', file, onDone);
 	});
 }
 
