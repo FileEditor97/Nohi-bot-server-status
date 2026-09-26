@@ -46,11 +46,12 @@ require('dns').resolve('www.discord.com', function(err) {
 const ChildProcess = require('child_process');
 var instances = [];
 
-// start instances
-for (let i = 0; i < config["instances"].length; i++) {
-	// create child process for every instance
+const RESTART_DELAY = 10 * 1000;
+
+function startInstance(i) {
+	// create child process for instance
 	let instance = ChildProcess.fork(__dirname + '/bot.js');
-	
+
 	instance.on('message', (m) => {
 		if (m.error) {
 			console.error('[%s][%s]: %s\n%s', getTime(), m.id, m.message, m.error);
@@ -58,10 +59,20 @@ for (let i = 0; i < config["instances"].length; i++) {
 			console.log('[%s][%s]: %s', getTime(), m.id, m.message);
 		}
 	});
-	
+
+	// restart instance if it dies
+	instance.on('exit', (code, signal) => {
+		console.error('[%s][%s]: Instance exited (code: %s, signal: %s). Restarting in %ss...', getTime(), i, code, signal, RESTART_DELAY / 1000);
+		setTimeout(() => startInstance(i), RESTART_DELAY);
+	});
+
 	// communicate id to instance
 	instance.send({id: i});
-	
-	// push to instances list
-	instances.push(instance);
+
+	instances[i] = instance;
+}
+
+// start instances
+for (let i = 0; i < config["instances"].length; i++) {
+	startInstance(i);
 };

@@ -28,6 +28,11 @@ async function sendError(text, err) {
 	});
 }
 
+// log stray promise rejections (e.g. Discord API errors) instead of crashing the instance
+process.on('unhandledRejection', (error) => {
+	sendError("Unhandled promise rejection.", error);
+});
+
 process.on('message', (m) => {
 	// get message type
 	if (Object.keys(m)[0] == "id") {
@@ -199,7 +204,7 @@ async function startStatusMessage(statusMessage) {
 				files: file
 			}).then(() => setTimeout(30000).finally(() => {
 				row.components[0].setDisabled(false);
-				statusMessage.edit({ components: [row] });
+				return statusMessage.edit({ components: [row] });
 			})).catch(error => {
 				sendError("Couldn't edit embed message.", error);
 			});
@@ -215,20 +220,23 @@ async function startStatusMessage(statusMessage) {
 client.on('interactionCreate', interaction => {
 	if (!interaction.isButton()) return;
 
+	// interaction may expire (Unknown interaction) if not acknowledged within 3s - don't crash on it
+	const onError = (error) => sendError("Couldn't respond to interaction.", error);
+
 	// Check for CustomID
 	//  connect button
 	if (interaction.customId == 'steamLink')
-		interaction.reply({ content: 'steam://connect/' + config["server_host"] + ':' + config["server_port"], ephemeral: true })
+		interaction.reply({ content: 'steam://connect/' + config["server_host"] + ':' + config["server_port"], ephemeral: true }).catch(onError);
 
 	//  refresh button
 	else if (interaction.customId == 'refresh') {
-		interaction.deferUpdate();
+		interaction.deferUpdate().catch(onError);
 		cancelTimeout.abort();
 	}
 
 	//  players list button
 	else if (interaction.customId == 'playerlist') {
-		return gamedig.query({
+		return GameDig.query({
 			type: config["server_type"],
 			host: config["server_host"],
 			port: config["server_port"],
@@ -244,10 +252,10 @@ client.on('interactionCreate', interaction => {
 
 			embed = getPlayerlist(state, embed, true);
 
-			interaction.reply({ embeds: [embed], ephemeral: true });
-		}).catch(() => {
-			interaction.reply({ content: "Не смог получить список игроков. Возможно, сервер оффлайн.", ephemeral: true });
-		});
+			return interaction.reply({ embeds: [embed], ephemeral: true });
+		}, () => {
+			return interaction.reply({ content: "Не смог получить список игроков. Возможно, сервер оффлайн.", ephemeral: true });
+		}).catch(onError);
 	}
 
 });
@@ -464,7 +472,7 @@ function graphDataPush(time, nbrPlayers) {
 	fs.readFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', (err, data) => {
 		// create file if does not exist
 		if (err) {
-			fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify([]), (error) => {if (error) throw error});
+			fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify([]), (error) => {if (error) sendError("Couldn't create JSON file.", error)});
 			return;
 		};
 
