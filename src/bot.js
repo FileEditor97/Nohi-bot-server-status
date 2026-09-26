@@ -269,7 +269,8 @@ client.on(Events.InteractionCreate, interaction => {
 
 			maxAttempts: 1,
 			socketTimeout: 2000,
-			givenPortOnly: true
+			givenPortOnly: true,
+			listenUdpPort: 13550
 		}).then((state) => {
 			let embed = new EmbedBuilder();
 
@@ -319,7 +320,8 @@ function generateStatusEmbed() {
 		maxAttempts: 3,
 		socketTimeout: 3000,
 		attemptTimeout: 9000,
-		givenPortOnly: true
+		givenPortOnly: true,
+		listenUdpPort: 13550
 	}).then((state) => {
 		// set embed color
 		embed.setColor(config["server_color"]);
