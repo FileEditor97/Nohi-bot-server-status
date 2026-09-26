@@ -17,13 +17,13 @@ const config = JSON.parse(fs.readFileSync(__dirname + '/config.json', 'utf8'));
 // create temp data folders
 if (!fs.existsSync(__dirname + "/temp")){
     fs.mkdirSync(__dirname + "/temp");
-};
+}
 if (!fs.existsSync(__dirname + "/temp/graphs")){
     fs.mkdirSync(__dirname + "/temp/graphs");
-};
+}
 if (!fs.existsSync(__dirname + "/temp/data")){
     fs.mkdirSync(__dirname + "/temp/data");
-};
+}
 
 //---------------------------------------------------------------------------------------------------
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -44,7 +44,7 @@ require('dns').resolve('www.discord.com', function(err) {
 
 // initiation
 const ChildProcess = require('child_process');
-var instances = [];
+let instances = [];
 
 const RESTART_DELAY = 10 * 1000;
 
@@ -75,4 +75,4 @@ function startInstance(i) {
 // start instances
 for (let i = 0; i < config["instances"].length; i++) {
 	startInstance(i);
-};
+}

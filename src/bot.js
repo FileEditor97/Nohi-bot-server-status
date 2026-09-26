@@ -8,10 +8,10 @@
 
 // read configs
 const fs = require('fs');
-var config = JSON.parse(fs.readFileSync(__dirname + '/config.json', 'utf8'));
+let config = JSON.parse(fs.readFileSync(__dirname + '/config.json', 'utf8'));
 
 // await for instance id
-var instanceId = -1;
+let instanceId = -1;
 
 async function sendMsg(text) {
 	process.send({
@@ -24,7 +24,7 @@ async function sendError(text, err) {
 	process.send({
 		id: instanceId,
 		message: text,
-		error: (err == undefined ? "No message" : err.stack),
+		error: (err === undefined ? "No message" : err.stack),
 	});
 }
 
@@ -35,7 +35,7 @@ process.on('unhandledRejection', (error) => {
 
 process.on('message', (m) => {
 	// get message type
-	if (Object.keys(m)[0] == "id") {
+	if (Object.keys(m)[0] === "id") {
 		// set instance id
 		instanceId = m.id;
 
@@ -53,14 +53,14 @@ function init() {
 	config = config["instances"][instanceId];
 
 	// set config defaults
-	if (config["timezone"] == "") config["timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	if (config["timezone"] === "") config["timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone;
 	
 	// connect to discord API
 	client.login(config["discordBotToken"]);
-};
+}
 
 function parse(text) {
-	return (text == "" ? undefined : text)
+	return (text === "" ? undefined : text)
 }
 
 //----------------------------------------------------------------------------------------------------------
@@ -94,21 +94,21 @@ client.on('ready', async () => {
 	// wait until process instance id received
 	while (instanceId < 0) {
 		await Sleep(1000);
-	};
+	}
 
 	// get channel
 	let statusChannel = client.channels.cache.get(config["serverStatusChannelId"]);
-	if (statusChannel == undefined) {
+	if (statusChannel === undefined) {
 		sendError("Channel by ID '" + config["serverStatusChannelId"] + "' not found.");
 		process.exit(1);
-	};
+	}
 
 	// get a status message
 	let statusMessage = await getStatusMessage(statusChannel);
-	if (statusMessage == undefined) {
+	if (statusMessage === undefined) {
 		sendError("Couldn't retrieve or create status message.");
 		process.exit(1);
-	};
+	}
 
 	// start server status loop
 	startStatusMessage(statusMessage);
@@ -118,7 +118,7 @@ client.on('ready', async () => {
 });
 
 // if reconnecting
-client.once('reconnecting', c => {
+client.once('reconnecting', () => {
 	sendMsg("Reconnecting...")
 });
 
@@ -128,10 +128,10 @@ client.once('reconnecting', c => {
 async function getStatusMessage(statusChannel) {
 	// get last message
 	let statusMessage = await getLastMessage(statusChannel);
-	if (statusMessage != undefined) {
+	if (statusMessage !== undefined) {
 		// return last message if exists
 		return statusMessage;
-	};
+	}
 
 	// OR create new message
 	let embed = new EmbedBuilder();
@@ -141,25 +141,24 @@ async function getStatusMessage(statusChannel) {
 	return await statusChannel.send({ embeds: [embed] }).then((sentMessage) => {
 		return sentMessage;
 	});
-};
+}
 
 function getLastMessage(statusChannel) {
 	return statusChannel.messages.fetch({ limit: 20 }).then(messages => {
 		// select bot messages
-		messages = messages.filter(msg => (msg.author.id == client.user.id && !msg.system));
+		messages = messages.filter(msg => (msg.author.id === client.user.id && !msg.system));
 
 		// return first message
 		return messages.first();
-	}).catch(function () {
-		return;
-	});
-};
+	}).catch(function () {});
+}
 
 
 //----------------------------------------------------------------------------------------------------------
 // main loops
 const dns = require('dns');
 async function startStatusMessage(statusMessage) {
+	// noinspection InfiniteLoopJS
 	while (true) {
 		dns.resolve('www.discord.com', err => {
 			if (err) {
@@ -168,7 +167,7 @@ async function startStatusMessage(statusMessage) {
 			}
 		});
 		try {
-			// steam link and refresh button button
+			// steam link and refresh button
 			let row = new ActionRowBuilder()
 				.addComponents(
 					new ButtonBuilder()
@@ -186,7 +185,7 @@ async function startStatusMessage(statusMessage) {
 						.setStyle(ButtonStyle.Primary)
 				);
 			}
-			if (config["server_playerlist"] == "1") {
+			if (config["server_playerlist"] === "1") {
 				row.addComponents(
 					new ButtonBuilder()
 						.setCustomId('playerlist')
@@ -210,11 +209,11 @@ async function startStatusMessage(statusMessage) {
 			});
 		} catch (error) {
 			sendError("Couldn't edit embed message.", error);
-		};
+		}
 
 		await SleepCanceable(config["statusUpdateTime"] * 1000);
-	};
-};
+	}
+}
 
 // buttons pressed on status message
 client.on('interactionCreate', interaction => {
@@ -225,17 +224,17 @@ client.on('interactionCreate', interaction => {
 
 	// Check for CustomID
 	//  connect button
-	if (interaction.customId == 'steamLink')
+	if (interaction.customId === 'steamLink')
 		interaction.reply({ content: 'steam://connect/' + config["server_host"] + ':' + config["server_port"], ephemeral: true }).catch(onError);
 
 	//  refresh button
-	else if (interaction.customId == 'refresh') {
+	else if (interaction.customId === 'refresh') {
 		interaction.deferUpdate().catch(onError);
 		cancelTimeout.abort();
 	}
 
 	//  players list button
-	else if (interaction.customId == 'playerlist') {
+	else if (interaction.customId === 'playerlist') {
 		return GameDig.query({
 			type: config["server_type"],
 			host: config["server_host"],
@@ -263,12 +262,13 @@ client.on('interactionCreate', interaction => {
 //----------------------------------------------------------------------------------------------------------
 // fetch data
 const { GameDig } = require('gamedig');
-var tic = false;
+let tic = false;
+
 function generateStatusEmbed() {
 	let embed = new EmbedBuilder();
 
 	// set embed name and logo
-	if (config["server_title"] != "") embed.setAuthor({ name: config["server_title"], iconURL: parse(config["server_logo"]), url: parse(config["server_url"]) });
+	if (config["server_title"] !== "") embed.setAuthor({ name: config["server_title"], iconURL: parse(config["server_logo"]), url: parse(config["server_url"]) });
 
 	// set embed updated time
 	tic = !tic;
@@ -298,7 +298,7 @@ function generateStatusEmbed() {
 
 		// set server name
 		let serverName = config["server_name"];
-		if (serverName == "") serverName = state.name;
+		if (serverName === "") serverName = state.name;
 
 		// refactor server name
 		//for (let i = 0; i < serverName.length; i++) {
@@ -318,14 +318,14 @@ function generateStatusEmbed() {
 		if (!config["minimal"]) {
 			embed.addFields(
 				{ name: "Прямое подключение" + ' :', value: "`" + state.connect + "`", inline: true },
-				{ name: "Режим игры" + ' :', value: (config["server_gamemode"] == "" ? config["server_type"] : config["server_gamemode"]), inline: true }
+				{ name: "Режим игры" + ' :', value: (config["server_gamemode"] === "" ? config["server_type"] : config["server_gamemode"]), inline: true }
 			);
-			if (state.map == "") {
+			if (state.map === "") {
 				embed.addFields({ name: "\u200B", value: "\u200B", inline: true });
 			} else {
 				embed.addFields({ name: "Карта" + ' :', value: state.map, inline: true });
-			};
-		};
+			}
+		}
 
 		embed.addFields(
 			{ name: "Статус" + ' :', value: "✅ " + "Онлайн", inline: true },
@@ -334,9 +334,9 @@ function generateStatusEmbed() {
 		);
 
 		// player list
-		if (config["server_playerlist"] == "2" && state.players.length > 0) {
+		if (config["server_playerlist"] === "2" && state.players.length > 0) {
 			embed = getPlayerlist(state, embed, false);
-		};
+		}
 
 		// set bot activity
 		client.user.setActivity("✅ Онлайн: " + state.players.length + "/" + state.maxplayers, { type: ActivityType.Watching });
@@ -349,7 +349,7 @@ function generateStatusEmbed() {
 			embed.setImage(
 				"attachment://graph_" + instanceId + ".png"
 			);
-		};
+		}
 		
 		return embed;
 	}).catch((error) => {
@@ -370,33 +370,12 @@ function generateStatusEmbed() {
 			embed.setImage(
 				"attachment://graph_" + instanceId + ".png"
 			);
-		};
+		}
 		return embed;
 	});
-};
+}
 
 function getPlayerlist(state, embed, isInline) {
-	// recover game data
-	let dataKeys = Object.keys(state.players[0]);
-
-	// set name as first
-	if (dataKeys.includes('name')) {
-		dataKeys = dataKeys.filter(e => e !== 'name');
-		dataKeys.splice(0, 0, 'name');
-	};
-
-	// remove some unwanted data
-	dataKeys = dataKeys.filter(e =>
-		e !== 'frags' &&
-		e !== 'score' &&
-		e !== 'guid' &&
-		e !== 'id' &&
-		e !== 'team' &&
-		e !== 'squad' &&
-		// e !== 'raw' && // need to parse raw data -> time and score
-		e !== 'skin'
-	);
-
 	// declare field label
 	let field_label = "Время и Ник";
 
@@ -414,20 +393,20 @@ function getPlayerlist(state, embed, isInline) {
 		}
 
 		// set player data
-		if (state.players[i]['name'] != undefined) {
+		if (state.players[i]['name'] !== undefined) {
 			let player_data = null;
 
 			// adding numbers to beginning of name list
 			let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
 			if (config["server_enable_numbers"]) {
 				fields[j] += index + '〕';
-			};
+			}
 
 			// player time data
 			player_data = state.players[i]['raw'].time;
-			if (player_data == undefined) {
+			if (player_data === undefined) {
 				player_data = 0;
-			};
+			}
 			// process time
 			let date = new Date(player_data * 1000).toISOString().substring(11, 19).split(":");
 			date = date[0] + ":" + date[1];
@@ -437,15 +416,15 @@ function getPlayerlist(state, embed, isInline) {
 
 			// player name data
 			player_data = state.players[i]['name'];
-			if (player_data == "") {
+			if (player_data === "") {
 				player_data = "*loading*";
-			};
+			}
 			// process name
 			for (let k = 0; k < player_data.length; k++) {
-				if (player_data[k] == "^") {
+				if (player_data[k] === "^") {
 					player_data = player_data.slice(0, k) + " " + player_data.slice(k + 2);
-				};
-			};
+				}
+			}
 			// handle very long strings
 			// maximum char. for every field is 1024, this implementation reaches ~1000
 			// 7 chars for brackets and 32 (9+22+1) per line
@@ -453,19 +432,19 @@ function getPlayerlist(state, embed, isInline) {
 
 			fields[j] += player_data;
 
-		};
+		}
 		fields[j] += "\n";
-	};
+	}
 	fields[j] += "```";
 
 	// add fields to embed
 	embed.addFields({ name: field_label + ' :', value: fields[0], inline: isInline });
 	for (let i = 1; i < fields.length; i++) {
 		embed.addFields({ name: '\u200B', value: fields[i], inline: isInline });
-	};
+	}
 
 	return embed;
-};
+}
 
 function graphDataPush(time, nbrPlayers) {
 	// save data to json file
@@ -474,7 +453,7 @@ function graphDataPush(time, nbrPlayers) {
 		if (err) {
 			fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify([]), (error) => {if (error) sendError("Couldn't create JSON file.", error)});
 			return;
-		};
+		}
 
 		let json;
 		// read old data and concat new data
@@ -483,20 +462,20 @@ function graphDataPush(time, nbrPlayers) {
 		} catch (error) {
 			sendError("Couldn't read JSON file.", error);
 			json = JSON.parse("[]");
-		};
+		}
 
 		// remove ~24 hour old data
 		let nbrMuchData = json.length - 24 * 60 * 60 / config["statusUpdateTime"];
 		if (nbrMuchData > 0) {
 			json.splice(0, nbrMuchData);
-		};
+		}
 
 		json.push({ "x": time, "y": nbrPlayers });
 
 		// rewrite data file 
 		fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify(json), () => {});
 	});
-};
+}
 
 //----------------------------------------------------------------------------------------------------------
 // create graph
@@ -505,8 +484,8 @@ const height = 400;
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 require('chartjs-adapter-date-fns');
 const { toZonedTime } = require('date-fns-tz');
-var canvasRenderService = new ChartJSNodeCanvas({ width, height });
-var timeFormat = {
+const canvasRenderService = new ChartJSNodeCanvas({width, height});
+const timeFormat = {
 	'millisecond': 'HH:mm',
 	'second': 'HH:mm',
 	'minute': 'HH:mm',
@@ -517,6 +496,7 @@ var timeFormat = {
 	'quarter': 'HH:mm',
 	'year': 'HH:mm',
 };
+
 async function generateGraph() {
 	while (client.token != null) { // client.token is not null if it's alive (logged in)
 		try {
@@ -537,7 +517,7 @@ async function generateGraph() {
 			for (let i = 0; i < data.length; i += 1) {
 				graph_labels.push(toZonedTime (data[i]["x"], config['timezone']));
 				graph_datas.push(data[i]["y"]);
-			};
+			}
 
 			let graphConfig = {
 				type: 'line',
@@ -638,14 +618,14 @@ async function generateGraph() {
 
 		} catch (error) {
 			sendError("Couldn't generate graph image.", error);
-		};
+		}
 
 		await Sleep(60 * 1000); // every minute
-	};
-};
+	}
+}
 
 // does what its name says
 function hexToRgb(hex, opacity) {
-	var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+	const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
 	return result ? "rgba(" + parseInt(result[1], 16) + ", " + parseInt(result[2], 16) + ", " + parseInt(result[3], 16) + ", " + opacity + ")" : null;
-};
+}
