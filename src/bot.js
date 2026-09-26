@@ -33,6 +33,14 @@ process.on('unhandledRejection', (error) => {
 	sendError("Unhandled promise rejection.", error);
 });
 
+// stop cleanly when main process asks (docker stop, Ctrl+C) or dies
+function shutdown() {
+	client.destroy().finally(() => process.exit(0));
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+process.on('disconnect', shutdown);
+
 process.on('message', (m) => {
 	// get message type
 	if (Object.keys(m)[0] === "id") {
@@ -55,8 +63,14 @@ function init() {
 	// set config defaults
 	if (config["timezone"] === "") config["timezone"] = Intl.DateTimeFormat().resolvedOptions().timeZone;
 	
-	// connect to discord API
-	client.login(config["discordBotToken"]);
+	// load saved graph data
+	graphDataLoad();
+
+	// connect to discord API, exit on failure so main process restarts the instance
+	client.login(config["discordBotToken"]).catch((error) => {
+		sendError("Couldn't log in to Discord.", error);
+		process.exit(1);
+	});
 }
 
 function parse(text) {
@@ -82,13 +96,13 @@ async function SleepCanceable(ms) {
 
 //----------------------------------------------------------------------------------------------------------
 // create client
-const {Client, EmbedBuilder, AttachmentBuilder, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType} = require('discord.js');
+const {Client, Events, EmbedBuilder, AttachmentBuilder, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ActivityType, MessageFlags, RESTJSONErrorCodes, embedLength} = require('discord.js');
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
 });
 
 // once client is ready
-client.on('ready', async () => {
+client.once(Events.ClientReady, async () => {
 	sendMsg("Logged in as \"" + client.user.tag + "\".");
 
 	// wait until process instance id received
@@ -110,16 +124,19 @@ client.on('ready', async () => {
 		process.exit(1);
 	}
 
+	// render first graph before first status update
+	if (config["server_enable_graph"]) await renderGraph();
+
 	// start server status loop
-	startStatusMessage(statusMessage);
+	startStatusMessage(statusChannel, statusMessage);
 
 	// start generate graph loop
-	generateGraph(); // needs it's own loop, as graph is generated only once every minute
+	if (config["server_enable_graph"]) generateGraph(); // needs it's own loop, as graph is generated only once every minute
 });
 
 // if reconnecting
-client.once('reconnecting', () => {
-	sendMsg("Reconnecting...")
+client.on(Events.ShardReconnecting, () => {
+	sendMsg("Reconnecting...");
 });
 
 
@@ -156,16 +173,10 @@ function getLastMessage(statusChannel) {
 
 //----------------------------------------------------------------------------------------------------------
 // main loops
-const dns = require('dns');
-async function startStatusMessage(statusMessage) {
+let editGeneration = 0;
+async function startStatusMessage(statusChannel, statusMessage) {
 	// noinspection InfiniteLoopJS
 	while (true) {
-		dns.resolve('www.discord.com', err => {
-			if (err) {
-				sendError("Lost connection to Discord.");
-				process.exit(1);
-			}
-		});
 		try {
 			// steam link and refresh button
 			let row = new ActionRowBuilder()
@@ -196,18 +207,33 @@ async function startStatusMessage(statusMessage) {
 			}
 
 			let embed = await generateStatusEmbed();
-			let file = config["server_enable_graph"] && fs.existsSync(__dirname + "/temp/graphs/graph_" + instanceId + ".png") ? 
-				[new AttachmentBuilder(__dirname + "/temp/graphs/graph_" + instanceId + ".png")] : [];
-			statusMessage.edit({
+			let file = config["server_enable_graph"] && graphBuffer !== undefined ?
+				[new AttachmentBuilder(graphBuffer, { name: "graph_" + instanceId + ".png" })] : [];
+			await statusMessage.edit({
 				embeds: [embed], components: [row],
 				files: file
-			}).then(() => setTimeout(30000).finally(() => {
+			});
+
+			// enable refresh button after 30s, unless message was updated again in meantime
+			let generation = ++editGeneration;
+			setTimeout(30000).then(() => {
+				if (generation !== editGeneration) return;
 				row.components[0].setDisabled(false);
 				return statusMessage.edit({ components: [row] });
-			})).catch(error => {
-				sendError("Couldn't edit embed message.", error);
+			}).catch(error => {
+				sendError("Couldn't enable refresh button.", error);
 			});
 		} catch (error) {
+			if (error.code === RESTJSONErrorCodes.UnknownMessage) {
+				// status message was deleted - create new one
+				sendMsg("Status message was deleted, creating new one.");
+				statusMessage = await getStatusMessage(statusChannel).catch(() => undefined);
+				if (statusMessage === undefined) {
+					sendError("Couldn't retrieve or create status message.");
+					process.exit(1);
+				}
+				continue;
+			}
 			sendError("Couldn't edit embed message.", error);
 		}
 
@@ -216,7 +242,7 @@ async function startStatusMessage(statusMessage) {
 }
 
 // buttons pressed on status message
-client.on('interactionCreate', interaction => {
+client.on(Events.InteractionCreate, interaction => {
 	if (!interaction.isButton()) return;
 
 	// interaction may expire (Unknown interaction) if not acknowledged within 3s - don't crash on it
@@ -225,7 +251,7 @@ client.on('interactionCreate', interaction => {
 	// Check for CustomID
 	//  connect button
 	if (interaction.customId === 'steamLink')
-		interaction.reply({ content: 'steam://connect/' + config["server_host"] + ':' + config["server_port"], ephemeral: true }).catch(onError);
+		interaction.reply({ content: 'steam://connect/' + config["server_host"] + ':' + config["server_port"], flags: MessageFlags.Ephemeral }).catch(onError);
 
 	//  refresh button
 	else if (interaction.customId === 'refresh') {
@@ -235,7 +261,8 @@ client.on('interactionCreate', interaction => {
 
 	//  players list button
 	else if (interaction.customId === 'playerlist') {
-		return GameDig.query({
+		// acknowledge first, query can take longer than 3s
+		return interaction.deferReply({ flags: MessageFlags.Ephemeral }).then(() => GameDig.query({
 			type: config["server_type"],
 			host: config["server_host"],
 			port: config["server_port"],
@@ -249,12 +276,12 @@ client.on('interactionCreate', interaction => {
 			embed.setTitle('Список игроков ('+state.players.length + "/" + state.maxplayers+'):');
 			embed.setColor(config["server_color"]);
 
-			embed = getPlayerlist(state, embed, true);
+			if (state.players.length > 0) embed = getPlayerlist(state, embed, true);
 
-			return interaction.reply({ embeds: [embed], ephemeral: true });
+			return interaction.editReply({ embeds: [embed] });
 		}, () => {
-			return interaction.reply({ content: "Не смог получить список игроков. Возможно, сервер оффлайн.", ephemeral: true });
-		}).catch(onError);
+			return interaction.editReply({ content: "Не смог получить список игроков. Возможно, сервер оффлайн." });
+		})).catch(onError);
 	}
 
 });
@@ -263,6 +290,7 @@ client.on('interactionCreate', interaction => {
 // fetch data
 const { GameDig } = require('gamedig');
 let tic = false;
+let serverOnline = undefined; // last known status, to log only on change
 
 function generateStatusEmbed() {
 	let embed = new EmbedBuilder();
@@ -298,7 +326,7 @@ function generateStatusEmbed() {
 
 		// set server name
 		let serverName = config["server_name"];
-		if (serverName === "") serverName = state.name;
+		if (serverName === "") serverName = state.name || "\u200B";
 
 		// refactor server name
 		//for (let i = 0; i < serverName.length; i++) {
@@ -338,6 +366,9 @@ function generateStatusEmbed() {
 			embed = getPlayerlist(state, embed, false);
 		}
 
+		if (serverOnline !== true) sendMsg("Server is online.");
+		serverOnline = true;
+
 		// set bot activity
 		client.user.setActivity("✅ Онлайн: " + state.players.length + "/" + state.maxplayers, { type: ActivityType.Watching });
 
@@ -353,7 +384,9 @@ function generateStatusEmbed() {
 		
 		return embed;
 	}).catch((error) => {
-		sendError("Couldn't query the server", error);
+		// log only when server goes offline, not every update
+		if (serverOnline !== false) sendError("Couldn't query the server", error);
+		serverOnline = false;
 
 		// set bot activity
 		client.user.setActivity("❌ Оффлайн.", { type: ActivityType.Watching });
@@ -375,47 +408,38 @@ function generateStatusEmbed() {
 	});
 }
 
+// formats seconds as HH:mm (hours can exceed 24)
+function formatPlaytime(seconds) {
+	seconds = Math.max(0, Math.floor(Number(seconds) || 0));
+	let hours = Math.floor(seconds / 3600);
+	let minutes = Math.floor(seconds % 3600 / 60);
+	return String(hours).padStart(2, "0") + ":" + String(minutes).padStart(2, "0");
+}
+
 function getPlayerlist(state, embed, isInline) {
 	// declare field label
 	let field_label = "Время и Ник";
 
-	let fields = [];
-	let j = 0;
-	fields[j] = "```\n";
+	// build one line per player
+	let lines = [];
 	for (let i = 0; i < state.players.length; i++) {
-		// divides players list into multiple fields if character limit reached for one field
-		if ((i + 1 - j * 30) > 30) {
-			fields[j] += "```";
-			j++;
-			fields[j] = "```\n";
-			/* field_value += "и еще " + (state.players.length - 64) + "...";
-			break; */
-		}
+		let line = "";
 
 		// set player data
 		if (state.players[i]['name'] !== undefined) {
-			let player_data = null;
-
 			// adding numbers to beginning of name list
 			let index = i + 1 > 9 ? i + 1 : "0" + (i + 1);
 			if (config["server_enable_numbers"]) {
-				fields[j] += index + '〕';
+				line += index + '〕';
 			}
 
-			// player time data
-			player_data = state.players[i]['raw'].time;
-			if (player_data === undefined) {
-				player_data = 0;
-			}
-			// process time
-			let date = new Date(player_data * 1000).toISOString().substring(11, 19).split(":");
-			date = date[0] + ":" + date[1];
-			fields[j] += date;
+			// player time data (raw may be missing for some games)
+			line += formatPlaytime(state.players[i].raw?.time);
 
-			fields[j] += "｜"
+			line += "｜"
 
 			// player name data
-			player_data = state.players[i]['name'];
+			let player_data = state.players[i]['name'];
 			if (player_data === "") {
 				player_data = "*loading*";
 			}
@@ -430,50 +454,79 @@ function getPlayerlist(state, embed, isInline) {
 			// 7 chars for brackets and 32 (9+22+1) per line
 			player_data = (player_data.length > 22) ? player_data.substring(0, 22 - 3) + "..." : player_data;
 
-			fields[j] += player_data;
-
+			line += player_data;
 		}
-		fields[j] += "\n";
+		lines.push(line);
 	}
-	fields[j] += "```";
+
+	// divide players list into fields of 30 lines, staying under discord embed limits
+	// (6000 characters total, 25 fields)
+	const FIELD_LINES = 30;
+	const OVERHEAD = field_label.length + 2 + 8; // name + code block brackets
+	let budget = 6000 - embedLength(embed.data) - 50; // reserve for "and N more"
+	let fieldsLeft = 25 - (embed.data.fields?.length ?? 0) - 1;
+
+	let fields = [];
+	let shown = 0;
+	while (shown < lines.length && fieldsLeft > 0) {
+		let chunk = lines.slice(shown, shown + FIELD_LINES);
+		// shrink chunk until it fits into remaining budget
+		while (chunk.length > 0 && chunk.join("\n").length + OVERHEAD > budget) {
+			chunk.pop();
+		}
+		if (chunk.length === 0) break;
+
+		let value = "```\n" + chunk.join("\n") + "\n```";
+		budget -= value.length + OVERHEAD;
+		fieldsLeft--;
+		fields.push(value);
+		shown += chunk.length;
+	}
 
 	// add fields to embed
-	embed.addFields({ name: field_label + ' :', value: fields[0], inline: isInline });
-	for (let i = 1; i < fields.length; i++) {
-		embed.addFields({ name: '\u200B', value: fields[i], inline: isInline });
+	for (let i = 0; i < fields.length; i++) {
+		embed.addFields({ name: i === 0 ? field_label + ' :' : '\u200B', value: fields[i], inline: isInline });
+	}
+	if (shown < lines.length) {
+		embed.addFields({ name: '\u200B', value: "и ещё " + (lines.length - shown) + "...", inline: false });
 	}
 
 	return embed;
 }
 
+// graph data is kept in memory and saved to disk to survive restarts
+let graphData = [];
+const GRAPH_PERIOD = 24 * 60 * 60 * 1000;
+
+function graphDataFile() {
+	return __dirname + '/temp/data/serverData_' + instanceId + '.json';
+}
+
+function graphDataLoad() {
+	try {
+		graphData = JSON.parse(fs.readFileSync(graphDataFile(), 'utf8'));
+		if (!Array.isArray(graphData)) graphData = [];
+	} catch (error) {
+		if (error.code !== 'ENOENT') sendError("Couldn't read JSON file.", error);
+		graphData = [];
+	}
+}
+
 function graphDataPush(time, nbrPlayers) {
-	// save data to json file
-	fs.readFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', (err, data) => {
-		// create file if does not exist
-		if (err) {
-			fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify([]), (error) => {if (error) sendError("Couldn't create JSON file.", error)});
-			return;
-		}
+	graphData.push({ "x": time.toISOString(), "y": nbrPlayers });
 
-		let json;
-		// read old data and concat new data
-		try {
-			json = JSON.parse(data);
-		} catch (error) {
-			sendError("Couldn't read JSON file.", error);
-			json = JSON.parse("[]");
-		}
+	// remove data older than 24 hours
+	let oldest = time.getTime() - GRAPH_PERIOD;
+	let nbrOld = graphData.findIndex(point => new Date(point.x).getTime() >= oldest);
+	if (nbrOld > 0) graphData.splice(0, nbrOld);
 
-		// remove ~24 hour old data
-		let nbrMuchData = json.length - 24 * 60 * 60 / config["statusUpdateTime"];
-		if (nbrMuchData > 0) {
-			json.splice(0, nbrMuchData);
-		}
-
-		json.push({ "x": time, "y": nbrPlayers });
-
-		// rewrite data file 
-		fs.writeFile(__dirname + '/temp/data/serverData_' + instanceId + '.json', JSON.stringify(json), () => {});
+	// write to temp file and rename, so file is never read half-written
+	let file = graphDataFile();
+	fs.writeFile(file + '.tmp', JSON.stringify(graphData), (error) => {
+		if (error) return sendError("Couldn't write JSON file.", error);
+		fs.rename(file + '.tmp', file, (error) => {
+			if (error) sendError("Couldn't write JSON file.", error);
+		});
 	});
 }
 
@@ -497,130 +550,122 @@ const timeFormat = {
 	'year': 'HH:mm',
 };
 
+let graphBuffer = undefined; // latest rendered graph image
+
 async function generateGraph() {
 	while (client.token != null) { // client.token is not null if it's alive (logged in)
-		try {
+		await Sleep(60 * 1000); // every minute
+		await renderGraph();
+	}
+}
 
-			// generate graph
-			let data = [];
+async function renderGraph() {
+	try {
 
-			try {
-				data = JSON.parse(fs.readFileSync(__dirname + '/temp/data/serverData_' + instanceId + '.json', { encoding: 'utf8', flag: 'r' }));
-			} catch (error) {
-				data = [];
-			}
+		// generate graph
+		let data = graphData;
 
-			let graph_labels = [];
-			let graph_datas = [];
+		let graph_labels = [];
+		let graph_datas = [];
 
-			// set data
-			for (let i = 0; i < data.length; i += 1) {
-				graph_labels.push(toZonedTime (data[i]["x"], config['timezone']));
-				graph_datas.push(data[i]["y"]);
-			}
-
-			let graphConfig = {
-				type: 'line',
-
-				data: {
-					labels: graph_labels,
-					datasets: [{
-						label: 'кол-во игроков',
-						data: graph_datas,
-
-						pointRadius: 0,
-
-						backgroundColor: hexToRgb(config["server_color"], 0.2),
-						borderColor: hexToRgb(config["server_color"], 1.0),
-
-						fill: true,
-						spanGaps: true // enable for a single dataset
-					}]
-				},
-
-				options: {
-					plugins: {
-						decimation: {
-							enabled: true,
-							algorithm: 'lttb',
-							samples: 500
-						},
-						legend: {
-							display: true,
-							labels: {
-								color: 'rgb(192,192,192)'
-							}
-						},
-					},
-
-					scales: {
-						yAxes: {
-							display: true,
-							beginAtZero: true,
-							ticks: {
-								color: 'rgb(192,192,192)',
-								precision: 0
-							},
-							grid: {
-								color: 'rgba(255,255,255,0.2)',
-								lineWidth: 0.5
-							}
-						},
-						xAxes: {
-							display: true,
-							type: 'time',
-							ticks: {
-								color: 'rgb(192,192,192)',
-								maxRotation: 0,
-								autoSkip: true,
-								maxTicksLimit: 10
-							},
-							time: {
-								parser: 'HH:mm',
-								displayFormats: timeFormat,
-								unit: 'hour',
-								stepSize: 1
-							},
-							grid: {
-								color: 'rgba(255,255,255,0.2)',
-								lineWidth: 0.5
-							}
-						}
-					},
-					datasets: {
-						normalized: true
-					},
-					elements: {
-						point: {
-							radius: 0
-						},
-						line: {
-							borderWidth: 2 // line width
-						}
-					},
-					animation: {
-						duration: 0
-					},
-					responsiveAnimationDuration: 0,
-					hover: {
-						animationDuration: 0
-					}
-				},
-			};
-
-			let graphFile = 'graph_' + instanceId + '.png';
-
-			canvasRenderService.renderToBuffer(graphConfig).then(data => {
-				fs.writeFileSync(__dirname + '/temp/graphs/' + graphFile, data);
-			}).catch((error) => {
-				sendError("Couldn't render graph.", error);
-			});
-
-		} catch (error) {
-			sendError("Couldn't generate graph image.", error);
+		// set data
+		for (let i = 0; i < data.length; i += 1) {
+			graph_labels.push(toZonedTime (data[i]["x"], config['timezone']));
+			graph_datas.push(data[i]["y"]);
 		}
 
-		await Sleep(60 * 1000); // every minute
+		let graphConfig = {
+			type: 'line',
+
+			data: {
+				labels: graph_labels,
+				datasets: [{
+					label: 'кол-во игроков',
+					data: graph_datas,
+
+					pointRadius: 0,
+
+					backgroundColor: hexToRgb(config["server_color"], 0.2),
+					borderColor: hexToRgb(config["server_color"], 1.0),
+
+					fill: true,
+					spanGaps: true // enable for a single dataset
+				}]
+			},
+
+			options: {
+				plugins: {
+					decimation: {
+						enabled: true,
+						algorithm: 'lttb',
+						samples: 500
+					},
+					legend: {
+						display: true,
+						labels: {
+							color: 'rgb(192,192,192)'
+						}
+					},
+				},
+
+				scales: {
+					yAxes: {
+						display: true,
+						beginAtZero: true,
+						ticks: {
+							color: 'rgb(192,192,192)',
+							precision: 0
+						},
+						grid: {
+							color: 'rgba(255,255,255,0.2)',
+							lineWidth: 0.5
+						}
+					},
+					xAxes: {
+						display: true,
+						type: 'time',
+						ticks: {
+							color: 'rgb(192,192,192)',
+							maxRotation: 0,
+							autoSkip: true,
+							maxTicksLimit: 10
+						},
+						time: {
+							parser: 'HH:mm',
+							displayFormats: timeFormat,
+							unit: 'hour',
+							stepSize: 1
+						},
+						grid: {
+							color: 'rgba(255,255,255,0.2)',
+							lineWidth: 0.5
+						}
+					}
+				},
+				datasets: {
+					normalized: true
+				},
+				elements: {
+					point: {
+						radius: 0
+					},
+					line: {
+						borderWidth: 2 // line width
+					}
+				},
+				animation: {
+					duration: 0
+				},
+				responsiveAnimationDuration: 0,
+				hover: {
+					animationDuration: 0
+				}
+			},
+		};
+
+		graphBuffer = await canvasRenderService.renderToBuffer(graphConfig);
+	} catch (error) {
+		sendError("Couldn't render graph.", error);
 	}
 }
 
