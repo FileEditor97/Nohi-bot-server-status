@@ -611,7 +611,7 @@ async function renderGraph() {
 				},
 
 				scales: {
-					yAxes: {
+					y: {
 						display: true,
 						beginAtZero: true,
 						ticks: {
@@ -623,7 +623,7 @@ async function renderGraph() {
 							lineWidth: 0.5
 						}
 					},
-					xAxes: {
+					x: {
 						display: true,
 						type: 'time',
 						ticks: {
