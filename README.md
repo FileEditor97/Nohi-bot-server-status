@@ -27,7 +27,7 @@ https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 # *English description*
 
 ## Requirements
-- Node.js and NPM (latest stable version)
+- Node.js 24 or newer and NPM
 - NVM (for managing Node version)
 - Discord bot application
 
@@ -42,7 +42,7 @@ https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 ## Changes by FileEditor
 - Dependencies version set to latest (at the time of this message)
 - Graph "fixed" and customized for my needs
-- Graphs are uploaded directly from bot's source foulder, rather than thru web server (as I'm not into js)
+- Graphs are rendered in memory and uploaded directly with the status message, rather than thru web server
 - More setup fields in config
 - Removed unwanted code
 - Removed web-server as it's not required
@@ -67,7 +67,7 @@ https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 # *Описание на русском*
 
 ## Требования
-- Node.js и NPM (последняя стабильная версия)
+- Node.js 24 или новее и NPM
 - NVM (для управления версий Node)
 - Приложение бота в панели разработчика Discord
 
@@ -82,7 +82,7 @@ https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 ## Отличия от оригинала
 - Установлена ​​последняя версия модулей (на момент появления этого сообщения)
 - График "исправлен" и настроен под мои нужды
-- Графики загружаются напрямую из исходного файла бота, а не через веб-сервер (так как я не увлекаюсь js)
+- Графики создаются в памяти и загружаются напрямую вместе с сообщением статуса, а не через веб-сервер
 - Дополнительные поля настройки в конфиге
 - Удален нежелательный код
 - Удален веб-сервер за ненадобностью
