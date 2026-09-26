@@ -27,7 +27,7 @@ https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 # *English description*
 
 ## Requirements
-- Node.js and NPM (latest stable version)
+- Node.js 24 or newer and NPM
 - NVM (for managing Node version)
 - Discord bot application
 
@@ -42,14 +42,14 @@ https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 ## Changes by FileEditor
 - Dependencies version set to latest (at the time of this message)
 - Graph "fixed" and customized for my needs
-- Graphs are uploaded directly from bot's source foulder, rather than thru web server (as I'm not into js)
+- Graphs are rendered in memory and uploaded directly with the status message, rather than thru web server
 - More setup fields in config
 - Removed unwanted code
 - Removed web-server as it's not required
-- Refresh button (after clicking it stays disabled for 10 seconds)
+- Refresh button (after clicking it stays disabled for 30 seconds)
 - Playerlist format changed to more compact (especialy for viewing on mobile)
 - Timezone problem fixed, now it's more flexible for configuration.
-- Playerlist displays every player (maximum of 25*30 = 750)
+- Playerlist displays as many players as fit into Discord embed limit (~150), the rest is shown as "and N more"
 - Button for displaying playerlist and option
 
 ## To-do List
@@ -67,7 +67,7 @@ https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 # *Описание на русском*
 
 ## Требования
-- Node.js и NPM (последняя стабильная версия)
+- Node.js 24 или новее и NPM
 - NVM (для управления версий Node)
 - Приложение бота в панели разработчика Discord
 
@@ -82,12 +82,12 @@ https://github.com/FileEditor97/Nohi-bot-server-status/wiki
 ## Отличия от оригинала
 - Установлена ​​последняя версия модулей (на момент появления этого сообщения)
 - График "исправлен" и настроен под мои нужды
-- Графики загружаются напрямую из исходного файла бота, а не через веб-сервер (так как я не увлекаюсь js)
+- Графики создаются в памяти и загружаются напрямую вместе с сообщением статуса, а не через веб-сервер
 - Дополнительные поля настройки в конфиге
 - Удален нежелательный код
 - Удален веб-сервер за ненадобностью
-- Кнопка «Обновить» (после нажатия она остается неактивной в течение первых 10 секунд)
+- Кнопка «Обновить» (после нажатия она остается неактивной в течение первых 30 секунд)
 - Формат списка игроков изменен на более компактный (особенно для просмотра на мобильных устройствах)
 - Исправлена ​​проблема с часовым поясом, теперь он более гибкий для настройки.
-- В списке игроков отображается каждый игрок (максимум 25*30 = 750)
+- В списке игроков отображается столько игроков, сколько помещается в лимит Discord (~150), остальные показаны как «и ещё N»
 - Кнопка для показания списка игроков и конфиг
